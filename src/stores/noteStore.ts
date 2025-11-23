@@ -3,6 +3,7 @@ import { useStorage } from '@vueuse/core';
 import { v4 as uuidv4 } from 'uuid';
 import type { NoteBlock, FilterTemplate, FilterRules } from '../types/models';
 import { computed } from 'vue';
+import { useUIStore } from './uiStore'; // Import UI Store
 
 export const useNoteStore = defineStore('note', () => {
   // --- State ---
@@ -31,10 +32,6 @@ export const useNoteStore = defineStore('note', () => {
       return notes.value;
     }
     return notes.value.filter(note => {
-      // OR Logic: Show note if it has ANY of the selected tags
-      // return activeFilter.value.includeTags.some(tag => note.tags.includes(tag));
-      
-      // AND Logic: Show note only if it has ALL selected tags (Drill down)
       return activeFilter.value.includeTags.every(tag => note.tags.includes(tag));
     });
   });
@@ -51,7 +48,6 @@ export const useNoteStore = defineStore('note', () => {
       updatedAt: Date.now(),
       isCollapsed: false,
     };
-    // Inherit current filter tags if they exist (convenience)
     if (activeFilter.value.includeTags.length > 0) {
         newNote.tags = [...activeFilter.value.includeTags];
     }
@@ -99,27 +95,30 @@ export const useNoteStore = defineStore('note', () => {
 
   // Filter & Template Actions
   function setFilterTag(tag: string) {
-    // Toggle tag in filter
     if (activeFilter.value.includeTags.includes(tag)) {
       activeFilter.value.includeTags = activeFilter.value.includeTags.filter(t => t !== tag);
     } else {
       activeFilter.value.includeTags.push(tag);
     }
-    // Clearing filter also clears current template association if it doesn't match
     currentTemplateId.value = null; 
   }
 
   function clearFilter() {
     activeFilter.value.includeTags = [];
     currentTemplateId.value = null;
+    // Reset UI to default when clearing filter (optional, but makes sense to exit "theme mode")
+    const uiStore = useUIStore();
+    uiStore.currentConfig = JSON.parse(JSON.stringify(uiStore.defaultConfig));
   }
 
   function createTemplate(name: string) {
+    const uiStore = useUIStore();
     const newTemplate: FilterTemplate = {
       id: uuidv4(),
       name,
-      filterRules: JSON.parse(JSON.stringify(activeFilter.value)), // Deep copy
-      themeConfig: undefined // Reserved for Phase 3
+      filterRules: JSON.parse(JSON.stringify(activeFilter.value)),
+      // Save current UI config with the template
+      themeConfig: JSON.parse(JSON.stringify(uiStore.currentConfig)) 
     };
     templates.value.push(newTemplate);
     currentTemplateId.value = newTemplate.id;
@@ -140,6 +139,15 @@ export const useNoteStore = defineStore('note', () => {
     if (template) {
       activeFilter.value = JSON.parse(JSON.stringify(template.filterRules));
       currentTemplateId.value = id;
+      
+      // Apply Theme if exists
+      if (template.themeConfig) {
+        const uiStore = useUIStore();
+        // Deep merge or replace? Replace is safer for "switch theme" feeling.
+        // But we must ensure all required fields exist.
+        // Since we save full config, full replace is fine.
+        uiStore.currentConfig = JSON.parse(JSON.stringify(template.themeConfig));
+      }
     }
   }
 

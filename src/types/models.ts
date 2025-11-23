@@ -10,23 +10,23 @@ export interface NoteBlock {
 
 export interface UIThemeConfig {
   // 布局
-  layout?: {
+  layout: {
     listStartX?: number;
     listStartY?: number;
-    blockWidth?: number;
+    blockWidth: number;
     filterPosition?: { x: number, y: number };
   };
   // 样式
-  style?: {
-    appBackgroundColor?: string;
-    blockBackgroundColor?: string;
-    blockFontColor?: string;
-    blockBorderRadius?: number;
-    blockBlur?: number; // px
-    tagColor?: string;
+  style: {
+    appBackgroundColor: string;
+    blockBackgroundColor: string;
+    blockFontColor: string;
+    blockBorderRadius: number;
+    blockBlur: number; // px
+    tagColor: string;
   };
   // 装饰物
-  decorations?: DecorationItem[];
+  decorations: DecorationItem[];
 }
 
 export interface DecorationItem {
