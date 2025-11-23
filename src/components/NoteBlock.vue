@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
 import { useTextareaAutosize } from '@vueuse/core';
 import type { NoteBlock } from '../types/models';
 import { useNoteStore } from '../stores/noteStore';
@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const store = useNoteStore();
 const { textarea, input } = useTextareaAutosize({ input: props.note.content });
+const newTagInput = ref('');
 
 // Watch for external changes (e.g. from store updates that didn't originate here)
 watch(
@@ -30,10 +31,21 @@ function updateTitle(e: Event) {
   const val = (e.target as HTMLInputElement).value;
   store.updateNote(props.note.id, { title: val });
 }
+
+function handleAddTag() {
+  if (newTagInput.value.trim()) {
+    store.addTag(props.note.id, newTagInput.value.trim());
+    newTagInput.value = '';
+  }
+}
+
+function removeTag(tag: string) {
+  store.removeTag(props.note.id, tag);
+}
 </script>
 
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden transition-all duration-300">
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden transition-all duration-300 group/card">
     <!-- Header -->
     <div class="flex items-center p-2 px-3 bg-gray-50 border-b border-gray-100 group">
       <button 
@@ -75,7 +87,35 @@ function updateTitle(e: Event) {
         placeholder="Type something..."
         rows="1"
       ></textarea>
+
+      <!-- Tags Area -->
+      <div class="mt-3 pt-2 border-t border-gray-50 flex flex-wrap items-center gap-2">
+        <div 
+          v-for="tag in note.tags" 
+          :key="tag"
+          class="bg-indigo-50 text-indigo-600 text-xs px-2 py-1 rounded-full flex items-center group/tag"
+        >
+          <span class="mr-1">#</span>{{ tag }}
+          <button 
+            @click="removeTag(tag)"
+            class="ml-1 text-indigo-400 hover:text-indigo-800 opacity-0 group-hover/tag:opacity-100 w-3 h-3 flex items-center justify-center transition-opacity"
+          >
+            &times;
+          </button>
+        </div>
+        
+        <div class="relative flex items-center">
+          <span class="absolute left-2 text-gray-400 text-xs pointer-events-none">#</span>
+          <input 
+            v-model="newTagInput"
+            @keydown.enter.prevent="handleAddTag"
+            @blur="handleAddTag"
+            type="text" 
+            placeholder="tag" 
+            class="bg-gray-50 hover:bg-white focus:bg-white border border-transparent hover:border-gray-200 focus:border-indigo-300 text-xs rounded-full pl-4 pr-2 py-1 w-20 focus:w-32 transition-all outline-none text-gray-600 placeholder-gray-400"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
-

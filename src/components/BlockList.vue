@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useNoteStore } from '../stores/noteStore';
 import NoteBlock from './NoteBlock.vue';
+import FilterBar from './FilterBar.vue';
 import { onMounted } from 'vue';
 
 const store = useNoteStore();
@@ -15,19 +16,27 @@ onMounted(() => {
 
 <template>
   <div class="max-w-3xl mx-auto pb-24 pt-8">
+    <!-- Filter Bar -->
+    <FilterBar />
+
+    <!-- Note List -->
     <TransitionGroup 
       name="list" 
       tag="div" 
       class="space-y-4"
     >
       <NoteBlock
-        v-for="note in store.notes"
+        v-for="note in store.filteredNotes"
         :key="note.id"
         :note="note"
       />
     </TransitionGroup>
 
-    <!-- Empty state placeholder if needed, though we auto-add -->
+    <!-- Empty State for Filter -->
+    <div v-if="store.filteredNotes.length === 0 && store.notes.length > 0" class="text-center py-12 text-gray-400">
+      <p>No notes match your filter.</p>
+      <button @click="store.clearFilter" class="text-indigo-500 hover:underline mt-2 text-sm">Clear filter</button>
+    </div>
     
     <!-- Floating Action Button -->
     <div class="fixed bottom-8 right-8 z-50">
@@ -63,4 +72,3 @@ onMounted(() => {
   z-index: -1;
 }
 </style>
-

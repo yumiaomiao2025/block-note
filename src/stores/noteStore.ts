@@ -1,10 +1,45 @@
 import { defineStore } from 'pinia';
 import { useStorage } from '@vueuse/core';
 import { v4 as uuidv4 } from 'uuid';
-import type { NoteBlock } from '../types/models';
+import type { NoteBlock, FilterTemplate, FilterRules } from '../types/models';
+import { computed } from 'vue';
 
 export const useNoteStore = defineStore('note', () => {
+  // --- State ---
   const notes = useStorage<NoteBlock[]>('blocknote-notes', []);
+  const templates = useStorage<FilterTemplate[]>('blocknote-templates', []);
+  
+  // Active filter state (not persisted automatically, resets on reload, or could be persisted)
+  const activeFilter = useStorage<FilterRules>('blocknote-active-filter', {
+    includeTags: []
+  });
+  
+  const currentTemplateId = useStorage<string | null>('blocknote-current-template', null);
+
+  // --- Getters ---
+  
+  const allTags = computed(() => {
+    const tags = new Set<string>();
+    notes.value.forEach(note => {
+      note.tags.forEach(tag => tags.add(tag));
+    });
+    return Array.from(tags).sort();
+  });
+
+  const filteredNotes = computed(() => {
+    if (activeFilter.value.includeTags.length === 0) {
+      return notes.value;
+    }
+    return notes.value.filter(note => {
+      // OR Logic: Show note if it has ANY of the selected tags
+      // return activeFilter.value.includeTags.some(tag => note.tags.includes(tag));
+      
+      // AND Logic: Show note only if it has ALL selected tags (Drill down)
+      return activeFilter.value.includeTags.every(tag => note.tags.includes(tag));
+    });
+  });
+
+  // --- Actions ---
 
   function addNote() {
     const newNote: NoteBlock = {
@@ -16,6 +51,10 @@ export const useNoteStore = defineStore('note', () => {
       updatedAt: Date.now(),
       isCollapsed: false,
     };
+    // Inherit current filter tags if they exist (convenience)
+    if (activeFilter.value.includeTags.length > 0) {
+        newNote.tags = [...activeFilter.value.includeTags];
+    }
     notes.value.push(newNote);
   }
 
@@ -40,12 +79,87 @@ export const useNoteStore = defineStore('note', () => {
     }
   }
 
+  // Tag Actions
+  function addTag(noteId: string, tag: string) {
+    const note = notes.value.find(n => n.id === noteId);
+    const trimmedTag = tag.trim();
+    if (note && trimmedTag && !note.tags.includes(trimmedTag)) {
+      note.tags.push(trimmedTag);
+      note.updatedAt = Date.now();
+    }
+  }
+
+  function removeTag(noteId: string, tag: string) {
+    const note = notes.value.find(n => n.id === noteId);
+    if (note) {
+      note.tags = note.tags.filter(t => t !== tag);
+      note.updatedAt = Date.now();
+    }
+  }
+
+  // Filter & Template Actions
+  function setFilterTag(tag: string) {
+    // Toggle tag in filter
+    if (activeFilter.value.includeTags.includes(tag)) {
+      activeFilter.value.includeTags = activeFilter.value.includeTags.filter(t => t !== tag);
+    } else {
+      activeFilter.value.includeTags.push(tag);
+    }
+    // Clearing filter also clears current template association if it doesn't match
+    currentTemplateId.value = null; 
+  }
+
+  function clearFilter() {
+    activeFilter.value.includeTags = [];
+    currentTemplateId.value = null;
+  }
+
+  function createTemplate(name: string) {
+    const newTemplate: FilterTemplate = {
+      id: uuidv4(),
+      name,
+      filterRules: JSON.parse(JSON.stringify(activeFilter.value)), // Deep copy
+      themeConfig: undefined // Reserved for Phase 3
+    };
+    templates.value.push(newTemplate);
+    currentTemplateId.value = newTemplate.id;
+  }
+
+  function deleteTemplate(id: string) {
+    const index = templates.value.findIndex(t => t.id === id);
+    if (index !== -1) {
+      templates.value.splice(index, 1);
+      if (currentTemplateId.value === id) {
+        currentTemplateId.value = null;
+      }
+    }
+  }
+
+  function switchTemplate(id: string) {
+    const template = templates.value.find(t => t.id === id);
+    if (template) {
+      activeFilter.value = JSON.parse(JSON.stringify(template.filterRules));
+      currentTemplateId.value = id;
+    }
+  }
+
   return {
     notes,
+    templates,
+    activeFilter,
+    currentTemplateId,
+    allTags,
+    filteredNotes,
     addNote,
     deleteNote,
     updateNote,
     toggleCollapse,
+    addTag,
+    removeTag,
+    setFilterTag,
+    clearFilter,
+    createTemplate,
+    deleteTemplate,
+    switchTemplate
   };
 });
-
