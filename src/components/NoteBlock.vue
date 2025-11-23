@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import { useTextareaAutosize } from '@vueuse/core';
 import type { NoteBlock } from '../types/models';
 import { useNoteStore } from '../stores/noteStore';
+import html2canvas from 'html2canvas';
 
 const props = defineProps<{
   note: NoteBlock;
@@ -11,6 +12,8 @@ const props = defineProps<{
 const store = useNoteStore();
 const { textarea, input } = useTextareaAutosize({ input: props.note.content });
 const newTagInput = ref('');
+const isZenMode = ref(false);
+const cardRef = ref<HTMLElement | null>(null);
 
 // Watch for external changes (e.g. from store updates that didn't originate here)
 watch(
@@ -42,10 +45,77 @@ function handleAddTag() {
 function removeTag(tag: string) {
   store.removeTag(props.note.id, tag);
 }
+
+function toggleZenMode() {
+    isZenMode.value = !isZenMode.value;
+    // Prevent body scroll when in Zen mode
+    if (isZenMode.value) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
+}
+
+async function exportCard() {
+  if (cardRef.value) {
+    const canvas = await html2canvas(cardRef.value, {
+      backgroundColor: null,
+      scale: 2 // High res
+    });
+    const link = document.createElement('a');
+    link.download = `note-${props.note.title || 'untitled'}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+}
 </script>
 
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden transition-all duration-300 group/card">
+  <!-- Zen Mode Overlay -->
+  <Teleport to="body">
+      <div v-if="isZenMode" class="fixed inset-0 z-[100] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center p-8 transition-opacity duration-500">
+          <button 
+            @click="toggleZenMode"
+            class="absolute top-8 right-8 text-gray-400 hover:text-gray-800 transition-colors"
+            title="Exit Zen Mode"
+          >
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
+             </svg>
+          </button>
+          
+          <div class="w-full max-w-3xl h-full flex flex-col">
+              <input 
+                type="text" 
+                :value="note.title"
+                @input="updateTitle"
+                placeholder="Untitled"
+                class="bg-transparent border-none outline-none font-bold text-4xl text-gray-800 placeholder-gray-300 mb-8 text-center"
+              />
+              <textarea
+                v-model="input"
+                class="w-full flex-1 resize-none border-none outline-none bg-transparent text-gray-700 text-xl leading-relaxed p-0 focus:ring-0"
+                placeholder="Type something..."
+              ></textarea>
+          </div>
+      </div>
+  </Teleport>
+
+  <div ref="cardRef" class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden transition-all duration-300 group/card relative">
+    <!-- Export Button (visible on hover) -->
+    <button 
+        @click="exportCard"
+        class="absolute top-2 right-2 z-10 text-gray-300 hover:text-indigo-500 opacity-0 group-hover/card:opacity-100 transition-all p-1 bg-white/80 rounded-full"
+        title="Export as Image"
+        v-if="!note.isCollapsed"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+            <path fill-rule="evenodd" d="M4.5 2A2.5 2.5 0 002 4.5v3.879a2.5 2.5 0 00.732 1.767l7.75 7.75a2.5 2.5 0 003.536 0l6.25-6.25a2.5 2.5 0 000-3.536l-7.75-7.75A2.5 2.5 0 0010.75 2H4.5zm4.97 5.97a.75.75 0 011.06 0l2.5 2.5a.75.75 0 11-1.06 1.06L9.75 9.31v6.44a.75.75 0 01-1.5 0V9.31L6.03 11.53a.75.75 0 11-1.06-1.06l2.5-2.5z" clip-rule="evenodd" />
+            <!-- Replaced with Share/Export icon for clarity, actually using a download-ish icon is better -->
+             <path fill-rule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clip-rule="evenodd" />
+        </svg>
+    </button>
+
     <!-- Header -->
     <div class="flex items-center p-2 px-3 bg-gray-50 border-b border-gray-100 group">
       <button 
@@ -67,6 +137,18 @@ function removeTag(tag: string) {
         placeholder="Untitled"
         class="flex-1 bg-transparent border-none outline-none font-semibold text-gray-700 placeholder-gray-400 text-sm"
       />
+      
+      <!-- Zen Mode Button -->
+      <button 
+        @click="toggleZenMode"
+        class="text-gray-300 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-all mr-2"
+        title="Zen Mode"
+      >
+         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+            <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+            <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 8.201 2.665 9.336 6.404.18.596.18 1.23 0 1.826C18.201 15.015 14.257 17.68 10 17.68c-4.257 0-8.201-2.665-9.336-6.404.18-.596.18-1.23 0 1.826zM10 14.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd" />
+         </svg>
+      </button>
 
       <button 
         @click="store.deleteNote(note.id)"

@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@vueuse/core": "^14.0.0",
+    "html2canvas": "^1.4.1",
     "pinia": "^3.0.4",
     "uuid": "^13.0.0",
     "vue": "^3.5.24"

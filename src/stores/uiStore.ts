@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { useStorage } from '@vueuse/core';
 import { ref } from 'vue';
-import type { UIThemeConfig } from '../types/models';
+import type { UIThemeConfig, DecorationItem } from '../types/models';
+import { v4 as uuidv4 } from 'uuid';
 
 export const useUIStore = defineStore('ui', () => {
   const isEditing = ref(false);
@@ -37,13 +38,33 @@ export const useUIStore = defineStore('ui', () => {
   function toggleEditMode() {
     isEditing.value = !isEditing.value;
   }
+  
+  function addDecoration(type: 'text' | 'image', content: string) {
+    const newDecor: DecorationItem = {
+        id: uuidv4(),
+        type,
+        content,
+        x: 100,
+        y: 100,
+        scale: 1,
+        zIndex: 0
+    };
+    currentConfig.value.decorations?.push(newDecor);
+  }
+
+  function removeDecoration(id: string) {
+    if (currentConfig.value.decorations) {
+        currentConfig.value.decorations = currentConfig.value.decorations.filter(d => d.id !== id);
+    }
+  }
 
   return {
     isEditing,
     currentConfig,
     defaultConfig,
     updateConfig,
-    toggleEditMode
+    toggleEditMode,
+    addDecoration,
+    removeDecoration
   };
 });
-
