@@ -2,6 +2,7 @@
 import BlockList from './components/BlockList.vue';
 import UIConfigPanel from './components/UIConfigPanel.vue';
 import DecorationLayer from './components/DecorationLayer.vue'; // Import Decoration Layer
+import ConfirmDialog from './components/ConfirmDialog.vue'; // Import ConfirmDialog
 import { useUIStore } from './stores/uiStore';
 import { computed } from 'vue';
 
@@ -47,6 +48,8 @@ const appStyles = computed(() => {
     <div class="px-4 relative z-10">
       <BlockList />
     </div>
+    
+    <ConfirmDialog />
   </div>
 </template>
 

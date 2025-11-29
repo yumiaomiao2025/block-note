@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
+import { useUIStore } from '../stores/uiStore';
 
 const store = useNoteStore();
+const uiStore = useUIStore();
 const isCreatingTemplate = ref(false);
 const newTemplateName = ref('');
 
@@ -18,6 +20,16 @@ function handleCreateTemplate() {
     newTemplateName.value = '';
     isCreatingTemplate.value = false;
   }
+}
+
+function handleDeleteTemplate(id: string) {
+  uiStore.showConfirm({
+    title: '删除模板',
+    message: '确认删除该模板吗？此操作无法撤销。',
+    confirmText: '删除',
+    cancelText: '取消',
+    onConfirm: () => store.deleteTemplate(id)
+  });
 }
 </script>
 
@@ -45,7 +57,7 @@ function handleCreateTemplate() {
             {{ tpl.name }}
           </button>
           <button 
-            @click.stop="store.deleteTemplate(tpl.id)"
+            @click.stop="handleDeleteTemplate(tpl.id)"
             class="px-1.5 py-1.5 rounded-r-md text-sm transition-colors border-y border-r border-l-0"
             :class="[store.currentTemplateId === tpl.id ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' : 'bg-white text-gray-400 border-gray-200 hover:bg-red-50 hover:text-red-500']"
           >

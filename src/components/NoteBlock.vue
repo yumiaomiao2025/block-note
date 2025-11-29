@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import { useTextareaAutosize } from '@vueuse/core';
 import type { NoteBlock } from '../types/models';
 import { useNoteStore } from '../stores/noteStore';
+import { useUIStore } from '../stores/uiStore';
 import { toPng } from 'html-to-image';
 
 const props = defineProps<{
@@ -10,6 +11,7 @@ const props = defineProps<{
 }>();
 
 const store = useNoteStore();
+const uiStore = useUIStore();
 const { textarea, input } = useTextareaAutosize({ input: props.note.content });
 const newTagInput = ref('');
 const isZenMode = ref(false);
@@ -43,7 +45,13 @@ function handleAddTag() {
 }
 
 function removeTag(tag: string) {
-  store.removeTag(props.note.id, tag);
+  uiStore.showConfirm({
+    title: '删除标签',
+    message: `确认删除标签 "${tag}" 吗？`,
+    confirmText: '删除',
+    cancelText: '取消',
+    onConfirm: () => store.removeTag(props.note.id, tag)
+  });
 }
 
 function toggleZenMode() {
@@ -54,6 +62,16 @@ function toggleZenMode() {
     } else {
         document.body.style.overflow = '';
     }
+}
+
+function handleDeleteNote() {
+  uiStore.showConfirm({
+    title: '删除笔记',
+    message: '确认删除该笔记吗？此操作无法撤销。',
+    confirmText: '删除',
+    cancelText: '取消',
+    onConfirm: () => store.deleteNote(props.note.id)
+  });
 }
 
 async function exportCard() {
@@ -114,20 +132,7 @@ async function exportCard() {
   </Teleport>
 
   <div ref="cardRef" class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden transition-all duration-300 group/card relative">
-    <!-- Export Button (visible on hover) -->
-    <button 
-        @click="exportCard"
-        class="absolute top-2 right-2 z-10 text-gray-300 hover:text-indigo-500 opacity-0 group-hover/card:opacity-100 transition-all p-1 bg-white/80 rounded-full"
-        title="Export as Image"
-        v-if="!note.isCollapsed"
-    >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-            <path fill-rule="evenodd" d="M4.5 2A2.5 2.5 0 002 4.5v3.879a2.5 2.5 0 00.732 1.767l7.75 7.75a2.5 2.5 0 003.536 0l6.25-6.25a2.5 2.5 0 000-3.536l-7.75-7.75A2.5 2.5 0 0010.75 2H4.5zm4.97 5.97a.75.75 0 011.06 0l2.5 2.5a.75.75 0 11-1.06 1.06L9.75 9.31v6.44a.75.75 0 01-1.5 0V9.31L6.03 11.53a.75.75 0 11-1.06-1.06l2.5-2.5z" clip-rule="evenodd" />
-            <!-- Replaced with Share/Export icon for clarity, actually using a download-ish icon is better -->
-             <path fill-rule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clip-rule="evenodd" />
-        </svg>
-    </button>
-
+    
     <!-- Header -->
     <div class="flex items-center p-2 px-3 bg-gray-50 border-b border-gray-100 group">
       <button 
@@ -150,10 +155,23 @@ async function exportCard() {
         class="flex-1 bg-transparent border-none outline-none font-semibold text-gray-700 placeholder-gray-400 text-sm"
       />
       
+    <!-- Export Button -->
+      <button 
+          @click="exportCard"
+          class="text-gray-300 hover:text-indigo-500 opacity-0 group-hover/card:opacity-100 transition-all"
+          title="Export as Image"
+          v-if="!note.isCollapsed"
+      >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+              <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+              <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+          </svg>
+      </button>
+
       <!-- Zen Mode Button -->
       <button 
         @click="toggleZenMode"
-        class="text-gray-300 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-all mr-2"
+        class="ml-2 text-gray-300 hover:text-indigo-500 opacity-0 group-hover/card:opacity-100 transition-all"
         title="Zen Mode"
       >
          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
@@ -163,8 +181,8 @@ async function exportCard() {
       </button>
 
       <button 
-        @click="store.deleteNote(note.id)"
-        class="ml-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+        @click="handleDeleteNote"
+        class="ml-2 text-gray-300 hover:text-red-500 opacity-0 group-hover/card:opacity-100 transition-all"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
           <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />

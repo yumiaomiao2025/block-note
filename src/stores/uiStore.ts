@@ -58,13 +58,50 @@ export const useUIStore = defineStore('ui', () => {
     }
   }
 
+  // --- Confirmation Dialog State ---
+  const confirmDialog = ref({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
+
+  function showConfirm(options: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }) {
+    confirmDialog.value = {
+      isOpen: true,
+      title: options.title,
+      message: options.message,
+      confirmText: options.confirmText || 'Confirm',
+      cancelText: options.cancelText || 'Cancel',
+      onConfirm: options.onConfirm,
+      onCancel: options.onCancel || (() => {})
+    };
+  }
+
+  function closeConfirm() {
+    confirmDialog.value.isOpen = false;
+  }
+
   return {
     isEditing,
     currentConfig,
     defaultConfig,
+    confirmDialog,
     updateConfig,
     toggleEditMode,
     addDecoration,
-    removeDecoration
+    removeDecoration,
+    showConfirm,
+    closeConfirm
   };
 });
