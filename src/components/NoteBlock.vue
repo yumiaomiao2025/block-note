@@ -3,7 +3,7 @@ import { ref, watch } from 'vue';
 import { useTextareaAutosize } from '@vueuse/core';
 import type { NoteBlock } from '../types/models';
 import { useNoteStore } from '../stores/noteStore';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 const props = defineProps<{
   note: NoteBlock;
@@ -58,14 +58,26 @@ function toggleZenMode() {
 
 async function exportCard() {
   if (cardRef.value) {
-    const canvas = await html2canvas(cardRef.value, {
-      backgroundColor: null,
-      scale: 2 // High res
-    });
-    const link = document.createElement('a');
-    link.download = `note-${props.note.title || 'untitled'}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    try {
+      const dataUrl = await toPng(cardRef.value, {
+        backgroundColor: 'rgba(0,0,0,0)', // 透明背景
+        pixelRatio: 2, // 高清
+        filter: (node) => {
+          // 排除不想导出的元素（比如导出按钮本身）
+          if (node.tagName && node.tagName.toLowerCase() === 'button') {
+             return false;
+          }
+          return true;
+        }
+      });
+      
+      const link = document.createElement('a');
+      link.download = `note-${props.note.title || 'untitled'}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
   }
 }
 </script>
