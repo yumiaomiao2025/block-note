@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useNoteStore } from '../stores/noteStore';
 import NoteBlock from './NoteBlock.vue';
-import FilterBar from './FilterBar.vue';
 import { onMounted } from 'vue';
 
 const store = useNoteStore();
@@ -16,9 +15,6 @@ onMounted(() => {
 
 <template>
   <div class="max-w-3xl mx-auto pb-24 pt-8">
-    <!-- Filter Bar -->
-    <FilterBar />
-
     <!-- Note List -->
     <TransitionGroup 
       name="list" 

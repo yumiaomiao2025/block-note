@@ -44,10 +44,17 @@ export interface FilterRules {
   // excludeTags: string[]; // Reserved for future use
 }
 
+export interface TagGroup {
+  id: string;
+  name: string;
+  tags: string[];
+}
+
 export interface FilterTemplate {
   id: string;
   name: string;
   filterRules: FilterRules;
   // Theme config bound to this template
-  themeConfig?: UIThemeConfig; 
+  themeConfig?: UIThemeConfig;
+  associatedTagGroups?: string[]; // IDs of TagGroups
 }

@@ -3,6 +3,7 @@ import BlockList from './components/BlockList.vue';
 import UIConfigPanel from './components/UIConfigPanel.vue';
 import DecorationLayer from './components/DecorationLayer.vue'; // Import Decoration Layer
 import ConfirmDialog from './components/ConfirmDialog.vue'; // Import ConfirmDialog
+import Sidebar from './components/Sidebar.vue'; // Import Sidebar
 import { useUIStore } from './stores/uiStore';
 import { computed } from 'vue';
 
@@ -23,30 +24,36 @@ const appStyles = computed(() => {
 </script>
 
 <template>
-  <div class="min-h-screen transition-colors duration-300 relative" :style="appStyles" style="background-color: var(--app-bg);">
+  <div class="min-h-screen flex transition-colors duration-300 relative" :style="appStyles" style="background-color: var(--app-bg);">
     <!-- Decoration Layer Background -->
     <DecorationLayer />
     
-    <div class="sticky top-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 px-4 py-3 mb-4 flex justify-between items-center transition-all duration-300">
-      <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-        <span class="w-6 h-6 bg-indigo-600 rounded text-white flex items-center justify-center text-xs shadow-md">B</span>
-        BlockNote
-      </h1>
-      <button 
-        @click="uiStore.toggleEditMode"
-        class="text-sm font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow"
-        :class="uiStore.isEditing ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-500 hover:bg-gray-50'"
-      >
-        {{ uiStore.isEditing ? 'Done' : 'Customize' }}
-      </button>
-    </div>
-    
-    <Transition name="slide-fade">
-      <UIConfigPanel v-if="uiStore.isEditing" />
-    </Transition>
+    <!-- Left Sidebar -->
+    <Sidebar class="z-50 relative" />
 
-    <div class="px-4 relative z-10">
-      <BlockList />
+    <!-- Main Content -->
+    <div class="flex-1 min-w-0 flex flex-col relative z-10">
+        <div class="sticky top-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 px-4 py-3 mb-4 flex justify-between items-center transition-all duration-300">
+          <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <span class="w-6 h-6 bg-indigo-600 rounded text-white flex items-center justify-center text-xs shadow-md">B</span>
+            BlockNote
+          </h1>
+          <button 
+            @click="uiStore.toggleEditMode"
+            class="text-sm font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow"
+            :class="uiStore.isEditing ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-500 hover:bg-gray-50'"
+          >
+            {{ uiStore.isEditing ? 'Done' : 'Customize' }}
+          </button>
+        </div>
+        
+        <Transition name="slide-fade">
+          <UIConfigPanel v-if="uiStore.isEditing" />
+        </Transition>
+
+        <div class="px-4 pb-12">
+          <BlockList />
+        </div>
     </div>
     
     <ConfirmDialog />

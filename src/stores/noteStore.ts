@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { useStorage } from '@vueuse/core';
 import { v4 as uuidv4 } from 'uuid';
-import type { NoteBlock, FilterTemplate, FilterRules } from '../types/models';
+import type { NoteBlock, FilterTemplate, FilterRules, TagGroup } from '../types/models';
 import { computed } from 'vue';
 import { useUIStore } from './uiStore'; // Import UI Store
 
@@ -9,6 +9,7 @@ export const useNoteStore = defineStore('note', () => {
   // --- State ---
   const notes = useStorage<NoteBlock[]>('blocknote-notes', []);
   const templates = useStorage<FilterTemplate[]>('blocknote-templates', []);
+  const tagGroups = useStorage<TagGroup[]>('blocknote-tag-groups', []);
   
   // Active filter state (not persisted automatically, resets on reload, or could be persisted)
   const activeFilter = useStorage<FilterRules>('blocknote-active-filter', {
@@ -25,6 +26,14 @@ export const useNoteStore = defineStore('note', () => {
       note.tags.forEach(tag => tags.add(tag));
     });
     return Array.from(tags).sort();
+  });
+
+  const uncategorizedTags = computed(() => {
+    const categorized = new Set<string>();
+    tagGroups.value.forEach(group => {
+      group.tags.forEach(tag => categorized.add(tag));
+    });
+    return allTags.value.filter(tag => !categorized.has(tag));
   });
 
   const filteredNotes = computed(() => {
@@ -93,6 +102,54 @@ export const useNoteStore = defineStore('note', () => {
     }
   }
 
+  // Tag Group Actions
+  function createTagGroup(name: string) {
+    const newGroup: TagGroup = {
+      id: uuidv4(),
+      name,
+      tags: []
+    };
+    tagGroups.value.push(newGroup);
+  }
+
+  function deleteTagGroup(id: string) {
+    const index = tagGroups.value.findIndex(g => g.id === id);
+    if (index !== -1) {
+      tagGroups.value.splice(index, 1);
+    }
+  }
+
+  function updateTagGroup(id: string, updates: Partial<TagGroup>) {
+    const group = tagGroups.value.find(g => g.id === id);
+    if (group) {
+      Object.assign(group, updates);
+    }
+  }
+
+  function addTagToGroup(groupId: string, tag: string) {
+    const group = tagGroups.value.find(g => g.id === groupId);
+    if (group && !group.tags.includes(tag)) {
+      // Remove from other groups first to ensure single assignment? 
+      // Or allow multi-group? Plan says "classify tags", usually implies one group or flexible.
+      // Let's assume flexible for now, but typically categorization implies unique parent.
+      // If we want strict categorization:
+      tagGroups.value.forEach(g => {
+        if (g.id !== groupId && g.tags.includes(tag)) {
+           g.tags = g.tags.filter(t => t !== tag);
+        }
+      });
+
+      group.tags.push(tag);
+    }
+  }
+
+  function removeTagFromGroup(groupId: string, tag: string) {
+    const group = tagGroups.value.find(g => g.id === groupId);
+    if (group) {
+      group.tags = group.tags.filter(t => t !== tag);
+    }
+  }
+
   // Filter & Template Actions
   function setFilterTag(tag: string) {
     if (activeFilter.value.includeTags.includes(tag)) {
@@ -100,6 +157,10 @@ export const useNoteStore = defineStore('note', () => {
     } else {
       activeFilter.value.includeTags.push(tag);
     }
+    // Note: We don't clear currentTemplateId immediately here to allow "modifying" the view temporarily,
+    // but strict behavior might require it. Original code did:
+    // currentTemplateId.value = null; 
+    // Let's keep it for now to indicate "unsaved changes" vs template.
     currentTemplateId.value = null; 
   }
 
@@ -111,17 +172,24 @@ export const useNoteStore = defineStore('note', () => {
     uiStore.currentConfig = JSON.parse(JSON.stringify(uiStore.defaultConfig));
   }
 
-  function createTemplate(name: string) {
+  function createTemplate(name: string, associatedTagGroups: string[] = []) {
     const uiStore = useUIStore();
     const newTemplate: FilterTemplate = {
       id: uuidv4(),
       name,
       filterRules: JSON.parse(JSON.stringify(activeFilter.value)),
-      // Save current UI config with the template
-      themeConfig: JSON.parse(JSON.stringify(uiStore.currentConfig)) 
+      themeConfig: JSON.parse(JSON.stringify(uiStore.currentConfig)),
+      associatedTagGroups
     };
     templates.value.push(newTemplate);
     currentTemplateId.value = newTemplate.id;
+  }
+
+  function updateTemplate(id: string, updates: Partial<FilterTemplate>) {
+    const template = templates.value.find(t => t.id === id);
+    if (template) {
+        Object.assign(template, updates);
+    }
   }
 
   function deleteTemplate(id: string) {
@@ -143,9 +211,6 @@ export const useNoteStore = defineStore('note', () => {
       // Apply Theme if exists
       if (template.themeConfig) {
         const uiStore = useUIStore();
-        // Deep merge or replace? Replace is safer for "switch theme" feeling.
-        // But we must ensure all required fields exist.
-        // Since we save full config, full replace is fine.
         uiStore.currentConfig = JSON.parse(JSON.stringify(template.themeConfig));
       }
     }
@@ -154,9 +219,11 @@ export const useNoteStore = defineStore('note', () => {
   return {
     notes,
     templates,
+    tagGroups,
     activeFilter,
     currentTemplateId,
     allTags,
+    uncategorizedTags,
     filteredNotes,
     addNote,
     deleteNote,
@@ -164,9 +231,15 @@ export const useNoteStore = defineStore('note', () => {
     toggleCollapse,
     addTag,
     removeTag,
+    createTagGroup,
+    deleteTagGroup,
+    updateTagGroup,
+    addTagToGroup,
+    removeTagFromGroup,
     setFilterTag,
     clearFilter,
     createTemplate,
+    updateTemplate,
     deleteTemplate,
     switchTemplate
   };
