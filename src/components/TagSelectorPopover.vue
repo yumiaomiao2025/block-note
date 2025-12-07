@@ -39,6 +39,10 @@ const groupedTags = computed(() => {
 const lightTags = computed(() => {
     if (props.mode !== 'light') return [];
     
+    // 从轻标签系统读取标签列表
+    const systemTags = store.lightTagSystem || [];
+    
+    // 统计使用频率用于排序
     const counts = new Map<string, number>();
     store.notes.forEach(note => {
         if (note.lightTags) {
@@ -47,7 +51,10 @@ const lightTags = computed(() => {
             });
         }
     });
-    return Array.from(counts.entries())
+    
+    // 按使用频率排序，但只返回系统中存在的标签
+    return systemTags
+        .map(tag => [tag, counts.get(tag) || 0] as [string, number])
         .sort((a, b) => b[1] - a[1])
         .map(e => e[0]);
 });

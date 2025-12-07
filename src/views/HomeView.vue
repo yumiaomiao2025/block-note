@@ -84,6 +84,10 @@ const candidateNotes = computed(() => {
 });
 
 const topTags = computed(() => {
+    // 从轻标签系统读取标签列表
+    const systemTags = store.lightTagSystem || [];
+    
+    // 统计使用频率用于排序（只统计当前候选笔记中的使用情况）
     const counts = new Map<string, number>();
     candidateNotes.value.forEach(note => {
         if (note.lightTags) {
@@ -93,11 +97,12 @@ const topTags = computed(() => {
         }
     });
     
-    // Convert to array, sort by count desc, take top 30
-    return Array.from(counts.entries())
+    // 按使用频率排序，但只返回系统中存在的标签
+    return systemTags
+        .map(tag => [tag, counts.get(tag) || 0] as [string, number])
         .sort((a, b) => b[1] - a[1])
         .slice(0, 30)
-        .map(entry => entry[0]);
+        .map(e => e[0]);
 });
 
 function toggleSecondaryTag(tag: string) {
@@ -119,7 +124,7 @@ function renameLightTag(oldTag: string) {
 
 function deleteLightTag(tag: string) {
     if (confirm(`Delete tag "${tag}" globally?`)) {
-        store.deleteTagGlobal(tag);
+        store.deleteLightTagGlobal(tag);
         // Remove from filter if present
         if (store.secondaryFilterTags.includes(tag)) {
             toggleSecondaryTag(tag);

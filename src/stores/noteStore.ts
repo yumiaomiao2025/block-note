@@ -10,6 +10,7 @@ export const useNoteStore = defineStore('note', () => {
   const notes = useStorage<NoteBlock[]>('blocknote-notes', []);
   const templates = useStorage<FilterTemplate[]>('blocknote-templates', []);
   const tagGroups = useStorage<TagGroup[]>('blocknote-tag-groups', []);
+  const lightTagSystem = useStorage<string[]>('blocknote-light-tag-system', []);
   
   // Active filter state (not persisted automatically, resets on reload, or could be persisted)
   const activeFilter = useStorage<FilterRules>('blocknote-active-filter', {
@@ -130,6 +131,11 @@ export const useNoteStore = defineStore('note', () => {
       if (!note.lightTags.includes(trimmedTag)) {
         note.lightTags.push(trimmedTag);
         note.updatedAt = Date.now();
+        
+        // 如果轻标签系统中没有这个标签，则添加到系统
+        if (!lightTagSystem.value.includes(trimmedTag)) {
+          lightTagSystem.value.push(trimmedTag);
+        }
       }
     }
   }
@@ -157,6 +163,12 @@ export const useNoteStore = defineStore('note', () => {
     if (secondaryFilterTags.value.includes(oldTag)) {
         secondaryFilterTags.value = secondaryFilterTags.value.map(t => t === oldTag ? trimmedNew : t);
     }
+    
+    // 更新轻标签系统
+    if (lightTagSystem.value.includes(oldTag)) {
+        lightTagSystem.value = lightTagSystem.value.map(t => t === oldTag ? trimmedNew : t);
+        lightTagSystem.value = [...new Set(lightTagSystem.value)];
+    }
   }
 
   function deleteLightTagGlobal(tag: string) {
@@ -166,6 +178,9 @@ export const useNoteStore = defineStore('note', () => {
         }
     });
     secondaryFilterTags.value = secondaryFilterTags.value.filter(t => t !== tag);
+    
+    // 从轻标签系统中删除
+    lightTagSystem.value = lightTagSystem.value.filter(t => t !== tag);
   }
 
   function renameTagGlobal(oldTag: string, newTag: string) {
@@ -342,6 +357,7 @@ export const useNoteStore = defineStore('note', () => {
     notes,
     templates,
     tagGroups,
+    lightTagSystem,
     activeFilter,
     isTemplateEnabled,
     isLightFilterEnabled,
