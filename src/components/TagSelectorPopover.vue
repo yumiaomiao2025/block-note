@@ -1,23 +1,28 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
+import { Teleport } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
 
 const props = defineProps<{
   mode: 'normal' | 'light';
   noteId: string;
+  triggerElement?: HTMLElement | null;
 }>();
 
 const emit = defineEmits(['close']);
 
 const store = useNoteStore();
 const activeTab = ref<'tags' | 'templates'>('tags');
-const searchQuery = ref('');
+
+// 浮窗位置
+const popoverStyle = ref({ top: '0px', left: '0px' });
+const elRef = ref<HTMLElement | null>(null);
 
 // --- Data Sources ---
 
 // Normal Tags: Grouped
 const groupedTags = computed(() => {
-  if (props.mode === 'light') return {}; // Light mode handles differently or simple list
+  if (props.mode === 'light') return {};
   
   const groups: Record<string, string[]> = {
     'Uncategorized': store.uncategorizedTags
@@ -34,7 +39,6 @@ const groupedTags = computed(() => {
 const lightTags = computed(() => {
     if (props.mode !== 'light') return [];
     
-    // Aggregate all light tags from all notes
     const counts = new Map<string, number>();
     store.notes.forEach(note => {
         if (note.lightTags) {
@@ -44,7 +48,7 @@ const lightTags = computed(() => {
         }
     });
     return Array.from(counts.entries())
-        .sort((a, b) => b[1] - a[1]) // Most frequent first
+        .sort((a, b) => b[1] - a[1])
         .map(e => e[0]);
 });
 
@@ -72,28 +76,74 @@ function applyTemplate(templateId: string) {
   emit('close');
 }
 
+// 计算浮窗位置
+function updatePosition() {
+  if (props.triggerElement && elRef.value) {
+    const rect = props.triggerElement.getBoundingClientRect();
+    const popoverRect = elRef.value.getBoundingClientRect();
+    
+    // 计算位置：按钮右上角对齐到浮窗右上角，向上偏移一点
+    const top = rect.top - popoverRect.height - 4; // 4px 间距
+    const left = rect.right - popoverRect.width; // 右对齐
+    
+    // 边界检查：如果浮窗超出视口左侧，则对齐到按钮左侧
+    const finalLeft = left < 8 ? rect.left : left;
+    
+    popoverStyle.value = {
+      top: `${Math.max(8, top)}px`, // 至少距离顶部 8px
+      left: `${finalLeft}px`
+    };
+  }
+}
+
+// 监听触发器元素变化
+watch(() => props.triggerElement, () => {
+  if (props.triggerElement) {
+    updatePosition();
+  }
+}, { immediate: true });
+
 // --- Click Outside ---
-const elRef = ref<HTMLElement | null>(null);
 function handleClickOutside(event: MouseEvent) {
   if (elRef.value && !elRef.value.contains(event.target as Node)) {
-    emit('close');
+    // 也要排除触发器元素
+    if (props.triggerElement && !props.triggerElement.contains(event.target as Node)) {
+      emit('close');
+    }
   }
 }
 
 onMounted(() => {
+  updatePosition();
+  // 使用 requestAnimationFrame 确保 DOM 已更新
+  requestAnimationFrame(() => {
+    updatePosition();
+  });
+  
+  // 监听滚动和窗口大小变化
+  window.addEventListener('scroll', updatePosition, true);
+  window.addEventListener('resize', updatePosition);
+  
   setTimeout(() => {
       document.addEventListener('click', handleClickOutside);
-  }, 100); // Small delay to prevent immediate close from trigger click
+  }, 100);
 });
 
 onUnmounted(() => {
+  window.removeEventListener('scroll', updatePosition, true);
+  window.removeEventListener('resize', updatePosition);
   document.removeEventListener('click', handleClickOutside);
 });
 
 </script>
 
 <template>
-  <div ref="elRef" class="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-xl w-64 flex flex-col max-h-80 overflow-hidden text-sm font-sans">
+  <Teleport to="body">
+    <div 
+      ref="elRef" 
+      class="fixed z-[100] bg-white border border-gray-200 rounded-lg shadow-xl w-64 flex flex-col max-h-80 overflow-hidden text-sm font-sans"
+      :style="popoverStyle"
+    >
     
     <!-- Tabs (Only for Normal Mode) -->
     <div v-if="mode === 'normal'" class="flex border-b border-gray-100">
@@ -177,7 +227,8 @@ onUnmounted(() => {
         </div>
 
     </div>
-  </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>

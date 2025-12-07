@@ -23,6 +23,10 @@ const cardRef = ref<HTMLElement | null>(null);
 const showNormalSelector = ref(false);
 const showLightSelector = ref(false);
 
+// Button refs for positioning
+const normalSelectorBtnRef = ref<HTMLElement | null>(null);
+const lightSelectorBtnRef = ref<HTMLElement | null>(null);
+
 // Watch for external changes 
 watch(
   () => props.note.content,
@@ -244,6 +248,7 @@ async function exportCard() {
         <!-- Right: Quick Add Button (Normal) -->
         <div class="relative ml-auto">
             <button 
+                ref="normalSelectorBtnRef"
                 @click.stop="showNormalSelector = !showNormalSelector"
                 class="text-gray-300 hover:text-indigo-500 p-1 rounded-full transition-colors"
                 title="Quick Add Tag/Template"
@@ -257,8 +262,8 @@ async function exportCard() {
                 v-if="showNormalSelector"
                 mode="normal"
                 :noteId="note.id"
+                :triggerElement="normalSelectorBtnRef"
                 @close="showNormalSelector = false"
-                class="bottom-full right-0 mb-1 origin-bottom-right"
             />
         </div>
       </div>
@@ -301,6 +306,7 @@ async function exportCard() {
          <!-- Right: Quick Add Button (Light) -->
          <div class="relative ml-auto">
              <button 
+                ref="lightSelectorBtnRef"
                 @click.stop="showLightSelector = !showLightSelector"
                 class="text-gray-300 hover:text-indigo-500 p-1 rounded-full transition-colors"
                 title="Quick Add Light Tag"
@@ -314,8 +320,8 @@ async function exportCard() {
                 v-if="showLightSelector"
                 mode="light"
                 :noteId="note.id"
+                :triggerElement="lightSelectorBtnRef"
                 @close="showLightSelector = false"
-                class="bottom-full right-0 mb-1 origin-bottom-right"
             />
          </div>
       </div>
