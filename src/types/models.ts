@@ -3,6 +3,7 @@ export interface NoteBlock {
   title: string;
   content: string; // HTML string or Markdown
   tags: string[];  // Tag names
+  lightTags?: string[]; // Light Tag names
   createdAt: number;
   updatedAt: number;
   isCollapsed: boolean; // UI state
@@ -53,6 +54,7 @@ export interface TagGroup {
 export interface FilterTemplate {
   id: string;
   name: string;
+  group?: string; // Template group name
   filterRules: FilterRules;
   // Theme config bound to this template
   themeConfig?: UIThemeConfig;

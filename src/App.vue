@@ -1,13 +1,23 @@
 <script setup lang="ts">
-import BlockList from './components/BlockList.vue';
-import UIConfigPanel from './components/UIConfigPanel.vue';
-import DecorationLayer from './components/DecorationLayer.vue'; // Import Decoration Layer
-import ConfirmDialog from './components/ConfirmDialog.vue'; // Import ConfirmDialog
-import Sidebar from './components/Sidebar.vue'; // Import Sidebar
+import { ref, computed } from 'vue';
+import HomeView from './views/HomeView.vue';
+import TagManagerView from './views/TagManagerView.vue';
+import TemplateManagerView from './views/TemplateManagerView.vue';
 import { useUIStore } from './stores/uiStore';
-import { computed } from 'vue';
+import DecorationLayer from './components/DecorationLayer.vue';
+import ConfirmDialog from './components/ConfirmDialog.vue';
 
 const uiStore = useUIStore();
+
+const activeTab = ref('home');
+
+const currentView = computed(() => {
+  switch (activeTab.value) {
+    case 'tags': return TagManagerView;
+    case 'templates': return TemplateManagerView;
+    default: return HomeView;
+  }
+});
 
 // Computed style object for dynamic CSS variables
 const appStyles = computed(() => {
@@ -24,36 +34,55 @@ const appStyles = computed(() => {
 </script>
 
 <template>
-  <div class="min-h-screen flex transition-colors duration-300 relative" :style="appStyles" style="background-color: var(--app-bg);">
+  <div class="h-screen flex flex-col relative transition-colors duration-300 font-sans text-gray-900 overflow-hidden" :style="appStyles" style="background-color: var(--app-bg);">
     <!-- Decoration Layer Background -->
     <DecorationLayer />
+
+    <!-- Navigation Tabs -->
+    <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur shadow-sm border-b border-gray-200 px-4 h-12 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-6 h-full">
+            <div class="flex items-center gap-2 font-bold text-gray-800 mr-2 select-none">
+                 <span class="w-6 h-6 bg-indigo-600 rounded text-white flex items-center justify-center text-xs shadow-md">B</span>
+                 <span class="hidden sm:inline">BlockNote</span>
+            </div>
+            
+            <button 
+                @click="activeTab = 'home'"
+                class="h-full border-b-2 px-3 text-sm font-medium transition-colors focus:outline-none"
+                :class="activeTab === 'home' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            >
+                Home
+            </button>
+            <button 
+                @click="activeTab = 'tags'"
+                class="h-full border-b-2 px-3 text-sm font-medium transition-colors focus:outline-none"
+                :class="activeTab === 'tags' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            >
+                Tags (Manager)
+            </button>
+            <button 
+                @click="activeTab = 'templates'"
+                class="h-full border-b-2 px-3 text-sm font-medium transition-colors focus:outline-none"
+                :class="activeTab === 'templates' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            >
+                Templates (Manager)
+            </button>
+        </div>
+
+        <div v-if="activeTab === 'home'">
+             <button 
+                @click="uiStore.toggleEditMode"
+                class="text-xs font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow focus:outline-none"
+                :class="uiStore.isEditing ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-500 hover:bg-gray-50'"
+              >
+                {{ uiStore.isEditing ? 'Done' : 'Customize UI' }}
+              </button>
+        </div>
+    </nav>
     
-    <!-- Left Sidebar -->
-    <Sidebar class="z-50 relative" />
-
     <!-- Main Content -->
-    <div class="flex-1 min-w-0 flex flex-col relative z-10">
-        <div class="sticky top-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 px-4 py-3 mb-4 flex justify-between items-center transition-all duration-300">
-          <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <span class="w-6 h-6 bg-indigo-600 rounded text-white flex items-center justify-center text-xs shadow-md">B</span>
-            BlockNote
-          </h1>
-          <button 
-            @click="uiStore.toggleEditMode"
-            class="text-sm font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow"
-            :class="uiStore.isEditing ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-500 hover:bg-gray-50'"
-          >
-            {{ uiStore.isEditing ? 'Done' : 'Customize' }}
-          </button>
-        </div>
-        
-        <Transition name="slide-fade">
-          <UIConfigPanel v-if="uiStore.isEditing" />
-        </Transition>
-
-        <div class="px-4 pb-12">
-          <BlockList />
-        </div>
+    <div class="flex-1 relative z-10 flex flex-col overflow-hidden h-[calc(100vh-3rem)]">
+        <component :is="currentView" class="h-full w-full" />
     </div>
     
     <ConfirmDialog />
@@ -90,9 +119,6 @@ const appStyles = computed(() => {
     color: var(--tag-color, #4f46e5) !important;
 }
 .bg-indigo-50 {
-    /* Create a lighter version of tag color automatically? 
-       For now just keep simple or use opacity if supported by browser logic 
-       or just rely on tag-color for text and default bg */
     background-color: color-mix(in srgb, var(--tag-color, #4f46e5) 10%, white) !important;
 }
 

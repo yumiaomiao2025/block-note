@@ -6,6 +6,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const useUIStore = defineStore('ui', () => {
   const isEditing = ref(false);
+  
+  // UI Visibility States for Tags
+  const showNormalTags = useStorage('blocknote-show-normal-tags', true);
+  const showLightTags = useStorage('blocknote-show-light-tags', true);
 
   const defaultConfig: UIThemeConfig = {
     layout: {
@@ -94,6 +98,8 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     isEditing,
+    showNormalTags,
+    showLightTags,
     currentConfig,
     defaultConfig,
     confirmDialog,

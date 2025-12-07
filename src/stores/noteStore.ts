@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { useStorage } from '@vueuse/core';
 import { v4 as uuidv4 } from 'uuid';
 import type { NoteBlock, FilterTemplate, FilterRules, TagGroup } from '../types/models';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useUIStore } from './uiStore'; // Import UI Store
 
 export const useNoteStore = defineStore('note', () => {
@@ -15,6 +15,12 @@ export const useNoteStore = defineStore('note', () => {
   const activeFilter = useStorage<FilterRules>('blocknote-active-filter', {
     includeTags: []
   });
+
+  // Toggle states for filters and visibility
+  const isTemplateEnabled = useStorage('blocknote-template-enabled', true);
+  const isLightFilterEnabled = useStorage('blocknote-light-filter-enabled', true);
+  // Secondary filter for Home View (Right Sidebar)
+  const secondaryFilterTags = ref<string[]>([]);
   
   const currentTemplateId = useStorage<string | null>('blocknote-current-template', null);
 
@@ -37,12 +43,24 @@ export const useNoteStore = defineStore('note', () => {
   });
 
   const filteredNotes = computed(() => {
-    if (activeFilter.value.includeTags.length === 0) {
-      return notes.value;
+    let result = notes.value;
+
+    // 1. Apply Template/Active Filter (if enabled)
+    if (isTemplateEnabled.value && activeFilter.value.includeTags.length > 0) {
+      result = result.filter(note => {
+        return activeFilter.value.includeTags.every(tag => note.tags.includes(tag));
+      });
     }
-    return notes.value.filter(note => {
-      return activeFilter.value.includeTags.every(tag => note.tags.includes(tag));
-    });
+
+    // 2. Apply Secondary Filter (Light Tags) (if enabled)
+    if (isLightFilterEnabled.value && secondaryFilterTags.value.length > 0) {
+        result = result.filter(note => {
+            // Check lightTags specifically. Note: existing notes might not have lightTags initialized.
+            return secondaryFilterTags.value.every(tag => note.lightTags?.includes(tag));
+        });
+    }
+    
+    return result;
   });
 
   // --- Actions ---
@@ -53,6 +71,7 @@ export const useNoteStore = defineStore('note', () => {
       title: '',
       content: '',
       tags: [],
+      lightTags: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
       isCollapsed: false,
@@ -100,6 +119,109 @@ export const useNoteStore = defineStore('note', () => {
       note.tags = note.tags.filter(t => t !== tag);
       note.updatedAt = Date.now();
     }
+  }
+
+  // Light Tag Actions
+  function addLightTag(noteId: string, tag: string) {
+    const note = notes.value.find(n => n.id === noteId);
+    const trimmedTag = tag.trim();
+    if (note && trimmedTag) {
+      if (!note.lightTags) note.lightTags = [];
+      if (!note.lightTags.includes(trimmedTag)) {
+        note.lightTags.push(trimmedTag);
+        note.updatedAt = Date.now();
+      }
+    }
+  }
+
+  function removeLightTag(noteId: string, tag: string) {
+    const note = notes.value.find(n => n.id === noteId);
+    if (note && note.lightTags) {
+      note.lightTags = note.lightTags.filter(t => t !== tag);
+      note.updatedAt = Date.now();
+    }
+  }
+
+  function renameLightTagGlobal(oldTag: string, newTag: string) {
+    const trimmedNew = newTag.trim();
+    if (!trimmedNew || trimmedNew === oldTag) return;
+    
+    notes.value.forEach(note => {
+        if (note.lightTags && note.lightTags.includes(oldTag)) {
+            note.lightTags = note.lightTags.map(t => t === oldTag ? trimmedNew : t);
+            note.lightTags = [...new Set(note.lightTags)];
+            note.updatedAt = Date.now();
+        }
+    });
+
+    if (secondaryFilterTags.value.includes(oldTag)) {
+        secondaryFilterTags.value = secondaryFilterTags.value.map(t => t === oldTag ? trimmedNew : t);
+    }
+  }
+
+  function deleteLightTagGlobal(tag: string) {
+    notes.value.forEach(note => {
+        if (note.lightTags) {
+            note.lightTags = note.lightTags.filter(t => t !== tag);
+        }
+    });
+    secondaryFilterTags.value = secondaryFilterTags.value.filter(t => t !== tag);
+  }
+
+  function renameTagGlobal(oldTag: string, newTag: string) {
+    const trimmedNew = newTag.trim();
+    if (!trimmedNew || trimmedNew === oldTag) return;
+
+    // 1. Update Notes
+    notes.value.forEach(note => {
+      if (note.tags.includes(oldTag)) {
+        note.tags = note.tags.map(t => t === oldTag ? trimmedNew : t);
+        // Remove duplicates if newTag already existed on note
+        note.tags = [...new Set(note.tags)];
+        note.updatedAt = Date.now();
+      }
+    });
+
+    // 2. Update Tag Groups
+    tagGroups.value.forEach(group => {
+      if (group.tags.includes(oldTag)) {
+        group.tags = group.tags.map(t => t === oldTag ? trimmedNew : t);
+        group.tags = [...new Set(group.tags)];
+      }
+    });
+
+    // 3. Update Templates
+    templates.value.forEach(template => {
+      if (template.filterRules.includeTags.includes(oldTag)) {
+        template.filterRules.includeTags = template.filterRules.includeTags.map(t => t === oldTag ? trimmedNew : t);
+        template.filterRules.includeTags = [...new Set(template.filterRules.includeTags)];
+      }
+    });
+    
+    // 4. Update Active Filter
+    if (activeFilter.value.includeTags.includes(oldTag)) {
+        activeFilter.value.includeTags = activeFilter.value.includeTags.map(t => t === oldTag ? trimmedNew : t);
+    }
+  }
+
+  function deleteTagGlobal(tag: string) {
+    // 1. Update Notes
+    notes.value.forEach(note => {
+      note.tags = note.tags.filter(t => t !== tag);
+    });
+
+    // 2. Update Tag Groups
+    tagGroups.value.forEach(group => {
+      group.tags = group.tags.filter(t => t !== tag);
+    });
+
+    // 3. Update Templates
+    templates.value.forEach(template => {
+      template.filterRules.includeTags = template.filterRules.includeTags.filter(t => t !== tag);
+    });
+    
+    // 4. Update Active Filter
+    activeFilter.value.includeTags = activeFilter.value.includeTags.filter(t => t !== tag);
   }
 
   // Tag Group Actions
@@ -221,6 +343,9 @@ export const useNoteStore = defineStore('note', () => {
     templates,
     tagGroups,
     activeFilter,
+    isTemplateEnabled,
+    isLightFilterEnabled,
+    secondaryFilterTags,
     currentTemplateId,
     allTags,
     uncategorizedTags,
@@ -231,6 +356,12 @@ export const useNoteStore = defineStore('note', () => {
     toggleCollapse,
     addTag,
     removeTag,
+    addLightTag,
+    removeLightTag,
+    renameLightTagGlobal,
+    deleteLightTagGlobal,
+    renameTagGlobal,
+    deleteTagGlobal,
     createTagGroup,
     deleteTagGroup,
     updateTagGroup,
