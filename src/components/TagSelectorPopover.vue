@@ -62,15 +62,44 @@ const lightTags = computed(() => {
 // Templates
 const templates = computed(() => store.templates);
 
+// 获取当前笔记的轻标签列表（用于高亮显示）
+const currentNoteLightTags = computed(() => {
+  if (props.mode !== 'light') return [];
+  const note = store.notes.find(n => n.id === props.noteId);
+  return note?.lightTags || [];
+});
+
+// 检查标签是否已存在于笔记中
+function isTagInNote(tag: string): boolean {
+  if (props.mode === 'normal') {
+    const note = store.notes.find(n => n.id === props.noteId);
+    return note?.tags.includes(tag) || false;
+  } else {
+    return currentNoteLightTags.value.includes(tag);
+  }
+}
+
 // --- Actions ---
 
 function addTag(tag: string) {
   if (props.mode === 'normal') {
+    // 普通标签模式：添加后关闭
     store.addTag(props.noteId, tag);
+    emit('close');
   } else {
-    store.addLightTag(props.noteId, tag);
+    // 轻标签模式：切换模式，不关闭弹窗
+    const note = store.notes.find(n => n.id === props.noteId);
+    if (note) {
+      if (currentNoteLightTags.value.includes(tag)) {
+        // 如果已存在，则移除
+        store.removeLightTag(props.noteId, tag);
+      } else {
+        // 如果不存在，则添加
+        store.addLightTag(props.noteId, tag);
+      }
+    }
+    // 不关闭弹窗，让用户可以继续操作
   }
-  emit('close');
 }
 
 function applyTemplate(templateId: string) {
@@ -223,7 +252,10 @@ onUnmounted(() => {
                   v-for="tag in lightTags" 
                   :key="tag"
                   @click="addTag(tag)"
-                  class="px-2 py-1 bg-gray-50 hover:bg-indigo-50 hover:text-indigo-600 rounded border border-gray-100 text-gray-600 transition-colors text-xs"
+                  class="px-2 py-1 rounded border text-xs transition-colors"
+                  :class="isTagInNote(tag) 
+                    ? 'bg-indigo-100 text-indigo-700 border-indigo-300 hover:bg-indigo-200' 
+                    : 'bg-gray-50 hover:bg-indigo-50 hover:text-indigo-600 border-gray-100 text-gray-600'"
                 >
                   {{ tag }}
                 </button>
