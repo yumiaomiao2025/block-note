@@ -11,6 +11,7 @@ export const useNoteStore = defineStore('note', () => {
   const templates = useStorage<FilterTemplate[]>('blocknote-templates', []);
   const tagGroups = useStorage<TagGroup[]>('blocknote-tag-groups', []);
   const lightTagSystem = useStorage<string[]>('blocknote-light-tag-system', []);
+  const normalTagSystem = useStorage<string[]>('blocknote-normal-tag-system', []);
   
   // Active filter state (not persisted automatically, resets on reload, or could be persisted)
   const activeFilter = useStorage<FilterRules>('blocknote-active-filter', {
@@ -28,11 +29,7 @@ export const useNoteStore = defineStore('note', () => {
   // --- Getters ---
   
   const allTags = computed(() => {
-    const tags = new Set<string>();
-    notes.value.forEach(note => {
-      note.tags.forEach(tag => tags.add(tag));
-    });
-    return Array.from(tags).sort();
+    return [...normalTagSystem.value].sort();
   });
 
   const uncategorizedTags = computed(() => {
@@ -111,6 +108,11 @@ export const useNoteStore = defineStore('note', () => {
     if (note && trimmedTag && !note.tags.includes(trimmedTag)) {
       note.tags.push(trimmedTag);
       note.updatedAt = Date.now();
+      
+      // 如果普通标签系统中没有这个标签，则添加到系统
+      if (!normalTagSystem.value.includes(trimmedTag)) {
+        normalTagSystem.value.push(trimmedTag);
+      }
     }
   }
 
@@ -217,6 +219,12 @@ export const useNoteStore = defineStore('note', () => {
     if (activeFilter.value.includeTags.includes(oldTag)) {
         activeFilter.value.includeTags = activeFilter.value.includeTags.map(t => t === oldTag ? trimmedNew : t);
     }
+    
+    // 5. Update Normal Tag System
+    if (normalTagSystem.value.includes(oldTag)) {
+        normalTagSystem.value = normalTagSystem.value.map(t => t === oldTag ? trimmedNew : t);
+        normalTagSystem.value = [...new Set(normalTagSystem.value)];
+    }
   }
 
   function deleteTagGlobal(tag: string) {
@@ -237,6 +245,9 @@ export const useNoteStore = defineStore('note', () => {
     
     // 4. Update Active Filter
     activeFilter.value.includeTags = activeFilter.value.includeTags.filter(t => t !== tag);
+    
+    // 5. Update Normal Tag System
+    normalTagSystem.value = normalTagSystem.value.filter(t => t !== tag);
   }
 
   // Tag Group Actions
@@ -277,6 +288,11 @@ export const useNoteStore = defineStore('note', () => {
       });
 
       group.tags.push(tag);
+      
+      // 如果普通标签系统中没有这个标签，则添加到系统
+      if (!normalTagSystem.value.includes(tag)) {
+        normalTagSystem.value.push(tag);
+      }
     }
   }
 
@@ -358,6 +374,7 @@ export const useNoteStore = defineStore('note', () => {
     templates,
     tagGroups,
     lightTagSystem,
+    normalTagSystem,
     activeFilter,
     isTemplateEnabled,
     isLightFilterEnabled,
