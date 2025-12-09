@@ -10,6 +10,7 @@ export const useUIStore = defineStore('ui', () => {
   // UI Visibility States for Tags
   const showNormalTags = useStorage('blocknote-show-normal-tags', true);
   const showLightTags = useStorage('blocknote-show-light-tags', true);
+  const lightTagDisplayLimit = useStorage('blocknote-light-tag-display-limit', 5);
 
   const defaultConfig: UIThemeConfig = {
     layout: {
@@ -100,6 +101,7 @@ export const useUIStore = defineStore('ui', () => {
     isEditing,
     showNormalTags,
     showLightTags,
+    lightTagDisplayLimit,
     currentConfig,
     defaultConfig,
     confirmDialog,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useTextareaAutosize } from '@vueuse/core';
 import type { NoteBlock } from '../types/models';
 import { useNoteStore } from '../stores/noteStore';
@@ -26,6 +26,12 @@ const showLightSelector = ref(false);
 // Button refs for positioning
 const normalSelectorBtnRef = ref<HTMLElement | null>(null);
 const lightSelectorBtnRef = ref<HTMLElement | null>(null);
+
+// More tags tooltip state
+const showMoreTagsTooltip = ref(false);
+const moreTagsButtonRef = ref<HTMLElement | null>(null);
+const moreTagsTooltipStyle = ref({ top: '0px', left: '0px' });
+const moreTagsTooltipRef = ref<HTMLElement | null>(null);
 
 // Watch for external changes 
 watch(
@@ -111,6 +117,67 @@ async function exportCard() {
     }
   }
 }
+
+// More tags tooltip functions
+function toggleMoreTagsTooltip() {
+  showMoreTagsTooltip.value = !showMoreTagsTooltip.value;
+  if (showMoreTagsTooltip.value) {
+    updateMoreTagsTooltipPosition();
+  }
+}
+
+function updateMoreTagsTooltipPosition() {
+  if (moreTagsButtonRef.value && moreTagsTooltipRef.value) {
+    const rect = moreTagsButtonRef.value.getBoundingClientRect();
+    const tooltipRect = moreTagsTooltipRef.value.getBoundingClientRect();
+    
+    // 计算位置：按钮下方，左对齐
+    const top = rect.bottom + 4; // 4px 间距
+    const left = rect.left;
+    
+    moreTagsTooltipStyle.value = {
+      top: `${top}px`,
+      left: `${left}px`
+    };
+  }
+}
+
+function handleClickOutsideTooltip(event: MouseEvent) {
+  if (moreTagsTooltipRef.value && !moreTagsTooltipRef.value.contains(event.target as Node)) {
+    if (moreTagsButtonRef.value && !moreTagsButtonRef.value.contains(event.target as Node)) {
+      showMoreTagsTooltip.value = false;
+    }
+  }
+}
+
+// Watch for tooltip visibility to update position
+watch(showMoreTagsTooltip, (newVal) => {
+  if (newVal) {
+    requestAnimationFrame(() => {
+      updateMoreTagsTooltipPosition();
+    });
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutsideTooltip);
+    }, 100);
+  } else {
+    document.removeEventListener('click', handleClickOutsideTooltip);
+  }
+});
+
+// Computed for remaining tags
+const displayedLightTags = computed(() => {
+  const limit = uiStore.lightTagDisplayLimit;
+  return (props.note.lightTags || []).slice(0, limit);
+});
+
+const remainingLightTags = computed(() => {
+  const limit = uiStore.lightTagDisplayLimit;
+  return (props.note.lightTags || []).slice(limit);
+});
+
+const shouldShowMoreIndicator = computed(() => {
+  return (props.note.lightTags?.length || 0) > uiStore.lightTagDisplayLimit;
+});
 </script>
 
 <template>
@@ -273,7 +340,7 @@ async function exportCard() {
          <!-- Left: Tags & Input -->
          <div class="flex flex-wrap items-center gap-2">
              <span 
-               v-for="tag in (note.lightTags || []).slice(0, 5)" 
+               v-for="tag in displayedLightTags" 
                :key="tag"
                class="text-[11px] text-gray-500 hover:text-indigo-600 transition-colors cursor-default select-none bg-gray-50 hover:bg-gray-100 px-1.5 py-0.5 rounded flex items-center gap-1 group/tag border border-transparent hover:border-gray-200"
              >
@@ -286,9 +353,14 @@ async function exportCard() {
                </button>
              </span>
              
-             <span v-if="(note.lightTags?.length || 0) > 5" class="text-[10px] text-gray-300 px-1">
-                +{{ (note.lightTags?.length || 0) - 5 }}
-             </span>
+             <button 
+               v-if="shouldShowMoreIndicator"
+               ref="moreTagsButtonRef"
+               @click="toggleMoreTagsTooltip"
+               class="text-[10px] text-gray-400 hover:text-indigo-600 px-1 cursor-pointer transition-colors"
+             >
+                +{{ remainingLightTags.length }}
+             </button>
              
              <!-- Light Tag Input (Unified Style) -->
              <div class="relative flex items-center">
@@ -328,4 +400,31 @@ async function exportCard() {
 
     </div>
   </div>
+  
+  <!-- More Tags Tooltip -->
+  <Teleport to="body">
+    <div 
+      v-if="showMoreTagsTooltip && remainingLightTags.length > 0"
+      ref="moreTagsTooltipRef"
+      class="fixed z-[9999] bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl backdrop-blur pointer-events-auto transition-opacity duration-200 max-w-xs"
+      :style="moreTagsTooltipStyle"
+    >
+      <div class="font-bold mb-2 border-b border-white/10 pb-1 text-gray-300">剩余标签</div>
+      <div class="flex flex-wrap gap-1.5">
+        <span 
+          v-for="tag in remainingLightTags" 
+          :key="tag"
+          class="text-[11px] text-gray-300 hover:text-white transition-colors cursor-default select-none bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded flex items-center gap-1 group/tag border border-transparent hover:border-white/20"
+        >
+          {{ tag }}
+          <button 
+            @click="removeLightTag(tag)"
+            class="text-gray-400 hover:text-red-400 opacity-0 group-hover/tag:opacity-100 transition-opacity"
+          >
+            &times;
+          </button>
+        </span>
+      </div>
+    </div>
+  </Teleport>
 </template>

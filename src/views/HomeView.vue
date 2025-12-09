@@ -2,6 +2,7 @@
 import { ref, computed, onUnmounted } from 'vue';
 import BlockList from '../components/BlockList.vue';
 import UIConfigPanel from '../components/UIConfigPanel.vue';
+import LightTagSettingsPopover from '../components/LightTagSettingsPopover.vue';
 import { useUIStore } from '../stores/uiStore';
 import { useNoteStore } from '../stores/noteStore';
 
@@ -114,6 +115,10 @@ function toggleSecondaryTag(tag: string) {
 }
 
 const isEditingLightTags = ref(false);
+
+// Light Tag Settings
+const showLightTagSettings = ref(false);
+const lightTagSettingsBtnRef = ref<HTMLElement | null>(null);
 
 function renameLightTag(oldTag: string) {
     const newTag = prompt('Rename tag:', oldTag);
@@ -276,6 +281,17 @@ function deleteLightTag(tag: string) {
                           <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 8.201 2.665 9.336 6.404.18.596.18 1.23 0 1.826C18.201 15.015 14.257 17.68 10 17.68c-4.257 0-8.201-2.665-9.336-6.404.18-.596.18-1.23 0 1.826zM10 14.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd" />
                        </svg>
                      </button>
+                     <button 
+                       ref="lightTagSettingsBtnRef"
+                       @click.stop="showLightTagSettings = !showLightTagSettings"
+                       class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
+                       :class="showLightTagSettings ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300 hover:bg-gray-200'"
+                       title="轻标签显示设置"
+                     >
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                         <path fill-rule="evenodd" d="M8.5 2a1 1 0 000 2h.5a1 1 0 100-2h-.5zM5.22 3.22a.75.75 0 000 1.06l.5.5a.75.75 0 001.06-1.06l-.5-.5a.75.75 0 00-1.06 0zM13 2a1 1 0 100 2h.5a1 1 0 100-2H13zM3.28 6.22a.75.75 0 00-1.06 1.06l.5.5a.75.75 0 101.06-1.06l-.5-.5zM17 8a1 1 0 01-1 1h-.5a1 1 0 110-2H16a1 1 0 011 1zM9 10.5a1 1 0 01.5.866v4.134a.75.75 0 001.5 0v-4.134A1 1 0 0111 10.5a1 1 0 01-2 0zM4.5 13a1 1 0 100-2h-.5a1 1 0 100 2h.5zM17.72 13.78a.75.75 0 10-1.06-1.06l-.5.5a.75.75 0 101.06 1.06l.5-.5zM10 18a1 1 0 100-2h.5a1 1 0 100 2H10zM3.22 16.78a.75.75 0 001.06-1.06l-.5-.5a.75.75 0 10-1.06 1.06l.5.5zM14.5 18a1 1 0 100-2h.5a1 1 0 100 2h-.5z" clip-rule="evenodd" />
+                       </svg>
+                     </button>
                  </div>
              </div>
              
@@ -331,6 +347,13 @@ function deleteLightTag(tag: string) {
                 </div>
             </div>
         </div>
+        
+        <!-- Light Tag Settings Popover -->
+        <LightTagSettingsPopover 
+            v-if="showLightTagSettings"
+            :triggerElement="lightTagSettingsBtnRef"
+            @close="showLightTagSettings = false"
+        />
     </div>
 
   </div>
