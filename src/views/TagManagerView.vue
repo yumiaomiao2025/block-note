@@ -104,14 +104,11 @@ const searchResults = computed(() => {
     return results;
 });
 
-// 过滤后的标签组列表（用于搜索高亮）
+// 标签组列表（始终显示所有标签组，搜索只用于高亮）
 const filteredTagGroups = computed(() => {
-    let groups = store.tagGroups;
-    if (searchQuery.value.trim()) {
-        const query = searchQuery.value.toLowerCase();
-        return groups.filter(g => g.name.toLowerCase().includes(query));
-    }
-    return groups;
+    // 始终返回所有标签组，不进行过滤
+    // 搜索功能只用于高亮显示和右侧标签过滤
+    return store.tagGroups;
 });
 
 const selectedGroupName = computed(() => {
