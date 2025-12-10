@@ -24,7 +24,26 @@ export const useNoteStore = defineStore('note', () => {
   // Secondary filter for Home View (Right Sidebar)
   const secondaryFilterTags = ref<string[]>([]);
   
-  const currentTemplateId = useStorage<string | null>('blocknote-current-template', null);
+  // Template multi-select
+  const selectedTemplateIds = useStorage<string[]>('blocknote-selected-templates', []);
+  const templateFilterMode = useStorage<'and' | 'or'>('blocknote-template-filter-mode', 'and');
+  
+  // Normal tag staging area
+  const normalTagStagingArea = ref<string[]>([]);
+  const isNormalTagFilterEnabled = useStorage('blocknote-normal-tag-filter-enabled', false);
+  const normalTagFilterMode = useStorage<'and' | 'or'>('blocknote-normal-tag-filter-mode', 'and');
+  
+  // Keep currentTemplateId for backward compatibility (will be removed later)
+  const currentTemplateId = computed({
+    get: () => selectedTemplateIds.value.length === 1 ? selectedTemplateIds.value[0] : null,
+    set: (val) => {
+      if (val) {
+        selectedTemplateIds.value = [val];
+      } else {
+        selectedTemplateIds.value = [];
+      }
+    }
+  });
 
   // --- Getters ---
   
@@ -43,14 +62,48 @@ export const useNoteStore = defineStore('note', () => {
   const filteredNotes = computed(() => {
     let result = notes.value;
 
-    // 1. Apply Template/Active Filter (if enabled)
-    if (isTemplateEnabled.value && activeFilter.value.includeTags.length > 0) {
+    // 1. Apply Template Filter (Multi-select with AND/OR mode)
+    if (isTemplateEnabled.value && selectedTemplateIds.value.length > 0) {
+      const selectedTemplates = templates.value.filter(t => selectedTemplateIds.value.includes(t.id));
+      
+      if (templateFilterMode.value === 'and') {
+        // AND mode: note must contain all tags from all selected templates
+        const allRequiredTags = new Set<string>();
+        selectedTemplates.forEach(template => {
+          template.filterRules.includeTags.forEach(tag => allRequiredTags.add(tag));
+        });
+        result = result.filter(note => {
+          return Array.from(allRequiredTags).every(tag => note.tags.includes(tag));
+        });
+      } else {
+        // OR mode: note must contain all tags from at least one template
+        result = result.filter(note => {
+          return selectedTemplates.some(template => {
+            return template.filterRules.includeTags.every(tag => note.tags.includes(tag));
+          });
+        });
+      }
+    } else if (isTemplateEnabled.value && activeFilter.value.includeTags.length > 0) {
+      // Fallback to activeFilter for backward compatibility
       result = result.filter(note => {
         return activeFilter.value.includeTags.every(tag => note.tags.includes(tag));
       });
     }
 
-    // 2. Apply Secondary Filter (Light Tags) (if enabled)
+    // 2. Apply Normal Tag Staging Area Filter (if enabled)
+    if (isNormalTagFilterEnabled.value && normalTagStagingArea.value.length > 0) {
+      if (normalTagFilterMode.value === 'and') {
+        result = result.filter(note => {
+          return normalTagStagingArea.value.every(tag => note.tags.includes(tag));
+        });
+      } else {
+        result = result.filter(note => {
+          return normalTagStagingArea.value.some(tag => note.tags.includes(tag));
+        });
+      }
+    }
+
+    // 3. Apply Secondary Filter (Light Tags) (if enabled)
     if (isLightFilterEnabled.value && secondaryFilterTags.value.length > 0) {
         result = result.filter(note => {
             // Check lightTags specifically. Note: existing notes might not have lightTags initialized.
@@ -324,7 +377,7 @@ export const useNoteStore = defineStore('note', () => {
 
   function clearFilter() {
     activeFilter.value.includeTags = [];
-    currentTemplateId.value = null;
+    selectedTemplateIds.value = [];
   }
 
   function createTemplate(name: string, associatedTagGroups: string[] = []) {
@@ -335,7 +388,7 @@ export const useNoteStore = defineStore('note', () => {
       associatedTagGroups
     };
     templates.value.push(newTemplate);
-    currentTemplateId.value = newTemplate.id;
+    selectedTemplateIds.value = [newTemplate.id];
   }
 
   function updateTemplate(id: string, updates: Partial<FilterTemplate>) {
@@ -349,18 +402,35 @@ export const useNoteStore = defineStore('note', () => {
     const index = templates.value.findIndex(t => t.id === id);
     if (index !== -1) {
       templates.value.splice(index, 1);
-      if (currentTemplateId.value === id) {
-        currentTemplateId.value = null;
-      }
+      selectedTemplateIds.value = selectedTemplateIds.value.filter(tid => tid !== id);
+    }
+  }
+
+  function toggleTemplate(id: string) {
+    const index = selectedTemplateIds.value.indexOf(id);
+    if (index > -1) {
+      selectedTemplateIds.value.splice(index, 1);
+    } else {
+      selectedTemplateIds.value.push(id);
     }
   }
 
   function switchTemplate(id: string) {
+    // For backward compatibility, but now uses toggleTemplate
     const template = templates.value.find(t => t.id === id);
     if (template) {
       activeFilter.value = JSON.parse(JSON.stringify(template.filterRules));
-      currentTemplateId.value = id;
+      selectedTemplateIds.value = [id];
     }
+  }
+
+  function getTemplateMatchCount(templateId: string): number {
+    const template = templates.value.find(t => t.id === templateId);
+    if (!template) return 0;
+    
+    return notes.value.filter(note => {
+      return template.filterRules.includeTags.every(tag => note.tags.includes(tag));
+    }).length;
   }
 
   return {
@@ -373,6 +443,11 @@ export const useNoteStore = defineStore('note', () => {
     isTemplateEnabled,
     isLightFilterEnabled,
     secondaryFilterTags,
+    selectedTemplateIds,
+    templateFilterMode,
+    normalTagStagingArea,
+    isNormalTagFilterEnabled,
+    normalTagFilterMode,
     currentTemplateId,
     allTags,
     uncategorizedTags,
@@ -399,7 +474,9 @@ export const useNoteStore = defineStore('note', () => {
     createTemplate,
     updateTemplate,
     deleteTemplate,
+    toggleTemplate,
     switchTemplate,
-    getTagUsageCount
+    getTagUsageCount,
+    getTemplateMatchCount
   };
 });

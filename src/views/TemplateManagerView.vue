@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
+import { v4 as uuidv4 } from 'uuid';
 
 const store = useNoteStore();
 
 const selectedTemplateId = ref<string | null>(null);
 const newTemplateName = ref('');
 const editingGroupName = ref(false); // For editing the group name directly
+const searchQuery = ref('');
+const templateSortOrder = ref<'manual' | 'usage' | 'time' | 'name'>('manual');
+const isBatchMode = ref(false);
+const selectedTemplateIdsForBatch = ref<Set<string>>(new Set());
+const showStats = ref(false);
+const batchGroupName = ref('');
 
 // --- Computed ---
 const groupedTemplates = computed(() => {
@@ -31,13 +38,61 @@ const groupNames = computed(() => {
 
 const selectedTemplate = computed(() => store.templates.find(t => t.id === selectedTemplateId.value));
 
+// Filtered and sorted templates
+const filteredTemplates = computed(() => {
+    let result = store.templates;
+    
+    // Apply search filter
+    if (searchQuery.value.trim()) {
+        const query = searchQuery.value.toLowerCase();
+        result = result.filter(t => t.name.toLowerCase().includes(query));
+    }
+    
+    // Apply sorting
+    if (templateSortOrder.value === 'name') {
+        result = [...result].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (templateSortOrder.value === 'usage') {
+        result = [...result].sort((a, b) => {
+            const countA = store.getTemplateMatchCount(a.id);
+            const countB = store.getTemplateMatchCount(b.id);
+            return countB - countA;
+        });
+    } else if (templateSortOrder.value === 'time') {
+        // Note: templates don't have createdAt, so we'll use array index as proxy
+        // In a real implementation, you'd want to add createdAt to FilterTemplate
+        result = [...result].reverse();
+    }
+    // 'manual' means keep original order
+    
+    return result;
+});
+
+const groupedFilteredTemplates = computed(() => {
+    const groups: Record<string, typeof filteredTemplates.value> = { 'General': [] };
+    filteredTemplates.value.forEach(t => {
+        const g = t.group || 'General';
+        if (!groups[g]) groups[g] = [];
+        groups[g].push(t);
+    });
+    return groups;
+});
+
+const groupNamesFiltered = computed(() => {
+    const keys = Object.keys(groupedFilteredTemplates.value);
+    return keys.sort((a, b) => {
+        if (a === 'General') return -1;
+        if (b === 'General') return 1;
+        return a.localeCompare(b);
+    });
+});
+
 // --- Actions ---
 function createTemplate() {
     if (newTemplateName.value.trim()) {
         store.createTemplate(newTemplateName.value.trim());
         newTemplateName.value = '';
-        if (store.currentTemplateId) {
-             selectedTemplateId.value = store.currentTemplateId;
+        if (store.selectedTemplateIds.length > 0) {
+             selectedTemplateId.value = store.selectedTemplateIds[0];
         }
     }
 }
@@ -84,6 +139,60 @@ function toggleTag(tag: string) {
     }
 }
 
+function duplicateTemplate(id: string) {
+    const template = store.templates.find(t => t.id === id);
+    if (!template) return;
+    
+    const newTemplate: typeof template = {
+        ...template,
+        id: uuidv4(),
+        name: `${template.name} Copy`
+    };
+    store.templates.push(newTemplate);
+    selectedTemplateId.value = newTemplate.id;
+}
+
+function toggleBatchSelection(id: string) {
+    if (selectedTemplateIdsForBatch.value.has(id)) {
+        selectedTemplateIdsForBatch.value.delete(id);
+    } else {
+        selectedTemplateIdsForBatch.value.add(id);
+    }
+}
+
+function selectAllTemplates() {
+    filteredTemplates.value.forEach(t => {
+        selectedTemplateIdsForBatch.value.add(t.id);
+    });
+}
+
+function deselectAllTemplates() {
+    selectedTemplateIdsForBatch.value.clear();
+}
+
+function batchDelete() {
+    if (selectedTemplateIdsForBatch.value.size === 0) return;
+    if (confirm(`Delete ${selectedTemplateIdsForBatch.value.size} template(s)?`)) {
+        selectedTemplateIdsForBatch.value.forEach(id => {
+            store.deleteTemplate(id);
+        });
+        selectedTemplateIdsForBatch.value.clear();
+        isBatchMode.value = false;
+        if (selectedTemplateId.value && selectedTemplateIdsForBatch.value.has(selectedTemplateId.value)) {
+            selectedTemplateId.value = null;
+        }
+    }
+}
+
+function batchChangeGroup(groupName: string) {
+    if (selectedTemplateIdsForBatch.value.size === 0) return;
+    selectedTemplateIdsForBatch.value.forEach(id => {
+        store.updateTemplate(id, { group: groupName.trim() || undefined });
+    });
+    selectedTemplateIdsForBatch.value.clear();
+    isBatchMode.value = false;
+}
+
 </script>
 
 <template>
@@ -91,7 +200,17 @@ function toggleTag(tag: string) {
       <!-- Left Sidebar: Template List -->
       <div class="w-64 border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
           <div class="p-4 border-b border-gray-200 bg-white">
-              <h2 class="font-bold text-lg text-gray-800">Templates</h2>
+              <div class="flex items-center justify-between mb-2">
+                  <h2 class="font-bold text-lg text-gray-800">Templates</h2>
+                  <button
+                      @click="showStats = !showStats"
+                      class="w-6 h-6 rounded border text-[10px] flex items-center justify-center transition-colors"
+                      :class="showStats ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
+                      title="Show/Hide Statistics"
+                  >
+                      #
+                  </button>
+              </div>
               <div class="mt-2 flex gap-2">
                   <input 
                     v-model="newTemplateName" 
@@ -101,23 +220,115 @@ function toggleTag(tag: string) {
                   />
                   <button @click="createTemplate" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-sm hover:bg-indigo-700">+</button>
               </div>
+              <!-- Search -->
+              <div class="mt-2">
+                  <input 
+                    v-model="searchQuery" 
+                    placeholder="Search templates..."
+                    class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
+                  />
+              </div>
+              <!-- Sort -->
+              <div class="mt-2">
+                  <select 
+                    v-model="templateSortOrder"
+                    class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
+                  >
+                      <option value="manual">Manual Order</option>
+                      <option value="name">Name (A-Z)</option>
+                      <option value="usage">Usage (High to Low)</option>
+                      <option value="time">Time (Newest First)</option>
+                  </select>
+              </div>
+              <!-- Batch Mode Toggle -->
+              <div class="mt-2 flex items-center gap-2">
+                  <button
+                      @click="isBatchMode = !isBatchMode; if (!isBatchMode) selectedTemplateIdsForBatch.clear()"
+                      class="text-xs px-2 py-1 rounded border transition-colors"
+                      :class="isBatchMode ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
+                  >
+                      {{ isBatchMode ? 'Exit Batch' : 'Batch Mode' }}
+                  </button>
+                  <div v-if="isBatchMode" class="flex gap-1">
+                      <button
+                          @click="selectAllTemplates"
+                          class="text-xs px-1.5 py-0.5 rounded border bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                          title="Select All"
+                      >
+                          All
+                      </button>
+                      <button
+                          @click="deselectAllTemplates"
+                          class="text-xs px-1.5 py-0.5 rounded border bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                          title="Deselect All"
+                      >
+                          None
+                      </button>
+                  </div>
+              </div>
+              <!-- Batch Actions -->
+              <div v-if="isBatchMode && selectedTemplateIdsForBatch.size > 0" class="mt-2 space-y-1">
+                  <button
+                      @click="batchDelete"
+                      class="w-full text-xs px-2 py-1 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                  >
+                      Delete ({{ selectedTemplateIdsForBatch.size }})
+                  </button>
+                  <div class="flex gap-1">
+                      <input
+                          v-model="batchGroupName"
+                          @keydown.enter="batchChangeGroup(batchGroupName)"
+                          placeholder="Group name..."
+                          class="flex-1 text-xs border rounded px-1.5 py-0.5"
+                      />
+                      <button
+                          @click="batchChangeGroup(batchGroupName)"
+                          class="text-xs px-2 py-0.5 rounded border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                      >
+                          Set
+                      </button>
+                  </div>
+              </div>
           </div>
           
           <div class="flex-1 overflow-y-auto p-2 space-y-4">
-              <div v-for="group in groupNames" :key="group">
+              <div v-for="group in groupNamesFiltered" :key="group">
                   <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">{{ group }}</div>
                   <div class="space-y-1">
                       <div 
-                        v-for="tpl in groupedTemplates[group]" 
+                        v-for="tpl in groupedFilteredTemplates[group]" 
                         :key="tpl.id"
-                        @click="selectedTemplateId = tpl.id"
+                        @click="isBatchMode ? toggleBatchSelection(tpl.id) : (selectedTemplateId = tpl.id)"
                         class="px-3 py-2 rounded cursor-pointer flex justify-between items-center group transition-colors"
-                        :class="selectedTemplateId === tpl.id ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-100 text-gray-700'"
+                        :class="[
+                            isBatchMode && selectedTemplateIdsForBatch.has(tpl.id) ? 'bg-indigo-100 text-indigo-700' : '',
+                            !isBatchMode && selectedTemplateId === tpl.id ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-100 text-gray-700'
+                        ]"
                       >
-                          <span class="truncate">{{ tpl.name }}</span>
-                          <button @click.stop="deleteTemplate(tpl.id)" class="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                            &times;
-                          </button>
+                          <div class="flex items-center gap-2 flex-1 min-w-0">
+                              <!-- Batch Checkbox -->
+                              <div v-if="isBatchMode" class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
+                                   :class="selectedTemplateIdsForBatch.has(tpl.id) ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'">
+                                  <svg v-if="selectedTemplateIdsForBatch.has(tpl.id)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-white">
+                                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                                  </svg>
+                              </div>
+                              <span class="truncate">{{ tpl.name }}</span>
+                              <span v-if="showStats" class="text-[10px] text-gray-400 ml-auto flex-shrink-0">
+                                  ({{ store.getTemplateMatchCount(tpl.id) }})
+                              </span>
+                          </div>
+                          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button @click.stop="duplicateTemplate(tpl.id)" class="text-gray-400 hover:text-indigo-600 p-1" title="Duplicate">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                                      <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
+                                      <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z" />
+                                  </svg>
+                              </button>
+                              <button @click.stop="deleteTemplate(tpl.id)" class="text-gray-400 hover:text-red-500 p-1">
+                                  &times;
+                              </button>
+                          </div>
                       </div>
                   </div>
               </div>
@@ -153,6 +364,10 @@ function toggleTag(tag: string) {
                                 class="border rounded px-1 py-0.5 text-sm"
                                 autoFocus
                               />
+                          </div>
+                          <!-- Statistics -->
+                          <div v-if="showStats" class="mt-2 text-xs text-gray-500">
+                              Matches: <span class="font-medium text-gray-700">{{ store.getTemplateMatchCount(selectedTemplate.id) }}</span> notes
                           </div>
                       </div>
                   </div>

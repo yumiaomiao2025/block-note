@@ -3,6 +3,7 @@ import { ref, computed, onUnmounted } from 'vue';
 import BlockList from '../components/BlockList.vue';
 import UIConfigPanel from '../components/UIConfigPanel.vue';
 import LightTagSettingsPopover from '../components/LightTagSettingsPopover.vue';
+import TagSelectorModal from '../components/TagSelectorModal.vue';
 import { useUIStore } from '../stores/uiStore';
 import { useNoteStore } from '../stores/noteStore';
 
@@ -29,9 +30,9 @@ const groupNames = computed(() => {
     });
 });
 
-function switchTemplate(id: string) {
-    store.switchTemplate(id);
-    // Clear secondary filter when switching main template
+function toggleTemplate(id: string) {
+    store.toggleTemplate(id);
+    // Clear secondary filter when toggling templates
     store.secondaryFilterTags = [];
 }
 
@@ -120,6 +121,32 @@ const isEditingLightTags = ref(false);
 const showLightTagSettings = ref(false);
 const lightTagSettingsBtnRef = ref<HTMLElement | null>(null);
 
+// Normal Tag Staging Area
+const isStagingAreaExpanded = ref(false);
+const showTagSelectorModal = ref(false);
+
+function toggleStagingArea() {
+    isStagingAreaExpanded.value = !isStagingAreaExpanded.value;
+}
+
+function toggleNormalTagInStaging(tag: string) {
+    if (store.normalTagStagingArea.includes(tag)) {
+        store.normalTagStagingArea = store.normalTagStagingArea.filter(t => t !== tag);
+    } else {
+        store.normalTagStagingArea.push(tag);
+    }
+}
+
+function handleTagSelectorConfirm(tags: string[]) {
+    // Add tags to staging area (avoid duplicates)
+    tags.forEach(tag => {
+        if (!store.normalTagStagingArea.includes(tag)) {
+            store.normalTagStagingArea.push(tag);
+        }
+    });
+    showTagSelectorModal.value = false;
+}
+
 function renameLightTag(oldTag: string) {
     const newTag = prompt('Rename tag:', oldTag);
     if (newTag && newTag.trim() !== oldTag) {
@@ -144,36 +171,135 @@ function deleteLightTag(tag: string) {
     
     <!-- Left Sidebar: Templates -->
     <div class="w-56 flex-shrink-0 border-r border-gray-200 bg-white/80 backdrop-blur flex flex-col h-full">
-        <div class="p-4 border-b border-gray-100 flex justify-between items-center">
-             <h2 class="font-bold text-gray-800 text-lg tracking-tight">Templates</h2>
-             <div class="flex gap-1">
-                 <button 
-                   @click="store.isTemplateEnabled = !store.isTemplateEnabled"
-                   class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
-                   :class="store.isTemplateEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                   title="Enable/Disable Templates Filter"
+        <div class="p-4 border-b border-gray-100">
+             <div class="flex justify-between items-center mb-2">
+                 <h2 class="font-bold text-gray-800 text-lg tracking-tight">Templates</h2>
+                 <div class="flex gap-1">
+                     <button 
+                       @click="store.isTemplateEnabled = !store.isTemplateEnabled"
+                       class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
+                       :class="store.isTemplateEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
+                       title="Enable/Disable Templates Filter"
+                     >
+                       T
+                     </button>
+                     <button 
+                       @click="uiStore.showNormalTags = !uiStore.showNormalTags"
+                       class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
+                       :class="uiStore.showNormalTags ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
+                       title="Show/Hide Tags on Cards"
+                     >
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                          <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                          <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 8.201 2.665 9.336 6.404.18.596.18 1.23 0 1.826C18.201 15.015 14.257 17.68 10 17.68c-4.257 0-8.201-2.665-9.336-6.404.18-.596.18-1.23 0 1.826zM10 14.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd" />
+                       </svg>
+                     </button>
+                 </div>
+             </div>
+             <!-- AND/OR Toggle -->
+             <div v-if="store.selectedTemplateIds.length > 0" class="flex items-center gap-2 mb-2">
+                 <button
+                   @click="store.templateFilterMode = 'and'"
+                   class="text-xs px-2 py-1 rounded border transition-colors"
+                   :class="store.templateFilterMode === 'and' ? 'bg-indigo-100 text-indigo-700 border-indigo-200 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
+                   title="AND: Notes must match all selected templates"
                  >
-                   T
+                   AND
                  </button>
-                 <button 
-                   @click="uiStore.showNormalTags = !uiStore.showNormalTags"
-                   class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
-                   :class="uiStore.showNormalTags ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                   title="Show/Hide Tags on Cards"
+                 <button
+                   @click="store.templateFilterMode = 'or'"
+                   class="text-xs px-2 py-1 rounded border transition-colors"
+                   :class="store.templateFilterMode === 'or' ? 'bg-indigo-100 text-indigo-700 border-indigo-200 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
+                   title="OR: Notes must match any selected template"
                  >
-                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-                      <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
-                      <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 8.201 2.665 9.336 6.404.18.596.18 1.23 0 1.826C18.201 15.015 14.257 17.68 10 17.68c-4.257 0-8.201-2.665-9.336-6.404.18-.596.18-1.23 0 1.826zM10 14.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd" />
-                   </svg>
+                   OR
                  </button>
+                 <span class="text-[10px] text-gray-400 ml-auto">{{ store.selectedTemplateIds.length }} selected</span>
              </div>
         </div>
         <div class="flex-1 overflow-y-auto p-2 space-y-4 custom-scrollbar" :class="{ 'opacity-50 pointer-events-none': !store.isTemplateEnabled }">
+             <!-- Normal Tag Staging Area -->
+             <div class="border-b border-gray-200 pb-4 mb-4">
+                 <div 
+                     @click="toggleStagingArea"
+                     class="px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 text-sm font-medium flex items-center justify-between hover:bg-gray-50"
+                 >
+                     <div class="flex items-center gap-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 transition-transform" :class="{ 'rotate-90': isStagingAreaExpanded }">
+                             <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                         </svg>
+                         <span class="text-gray-700">Tag Staging Area</span>
+                         <span v-if="store.normalTagStagingArea.length > 0" class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">{{ store.normalTagStagingArea.length }}</span>
+                     </div>
+                     <div class="flex items-center gap-1">
+                         <button
+                             @click.stop="store.isNormalTagFilterEnabled = !store.isNormalTagFilterEnabled"
+                             class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
+                             :class="store.isNormalTagFilterEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
+                             title="Enable/Disable Normal Tag Filter"
+                         >
+                             N
+                         </button>
+                         <button
+                             @click.stop="showTagSelectorModal = true"
+                             class="w-4 h-4 rounded border text-gray-400 border-gray-300 hover:bg-gray-100 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition-colors"
+                             title="Add Tags to Staging Area"
+                         >
+                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                                 <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                             </svg>
+                         </button>
+                     </div>
+                 </div>
+                 
+                 <!-- Expanded Content -->
+                 <Transition name="expand">
+                     <div v-if="isStagingAreaExpanded" class="mt-2 space-y-2">
+                         <!-- AND/OR Toggle -->
+                         <div v-if="store.normalTagStagingArea.length > 0" class="flex items-center gap-2 px-3">
+                             <button
+                                 @click="store.normalTagFilterMode = 'and'"
+                                 class="text-xs px-2 py-1 rounded border transition-colors"
+                                 :class="store.normalTagFilterMode === 'and' ? 'bg-purple-100 text-purple-700 border-purple-200 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
+                                 title="AND: Notes must contain all tags"
+                             >
+                                 AND
+                             </button>
+                             <button
+                                 @click="store.normalTagFilterMode = 'or'"
+                                 class="text-xs px-2 py-1 rounded border transition-colors"
+                                 :class="store.normalTagFilterMode === 'or' ? 'bg-purple-100 text-purple-700 border-purple-200 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
+                                 title="OR: Notes must contain any tag"
+                             >
+                                 OR
+                             </button>
+                         </div>
+                         
+                         <!-- Staged Tags -->
+                         <div class="flex flex-wrap gap-1.5 px-3">
+                             <button
+                                 v-for="tag in store.normalTagStagingArea"
+                                 :key="tag"
+                                 @click="toggleNormalTagInStaging(tag)"
+                                 class="text-xs px-2 py-1 rounded-md border transition-all flex items-center gap-1"
+                                 :class="store.isNormalTagFilterEnabled ? 'bg-purple-100 text-purple-700 border-purple-200 font-medium' : 'bg-gray-100 text-gray-600 border-gray-200'"
+                             >
+                                 {{ tag }}
+                                 <span class="text-purple-400 hover:text-red-500">&times;</span>
+                             </button>
+                             <div v-if="store.normalTagStagingArea.length === 0" class="text-xs text-gray-400 italic">
+                                 No tags in staging area. Click the + icon to add tags.
+                             </div>
+                         </div>
+                     </div>
+                 </Transition>
+             </div>
+             
              <!-- All Notes -->
              <div 
                 @click="clearTemplate"
                 class="px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 text-sm font-medium flex items-center gap-2"
-                :class="!store.currentTemplateId ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'hover:bg-gray-50 text-gray-600'"
+                :class="store.selectedTemplateIds.length === 0 ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'hover:bg-gray-50 text-gray-600'"
              >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 opacity-70">
                   <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z" clip-rule="evenodd" />
@@ -188,13 +314,20 @@ function deleteLightTag(tag: string) {
                       <div 
                         v-for="tpl in groupedTemplates[group]" 
                         :key="tpl.id"
-                        @click="switchTemplate(tpl.id)"
+                        @click="toggleTemplate(tpl.id)"
                         @mouseenter="onTemplateMouseEnter(tpl.id)"
                         @mouseleave="onTemplateMouseLeave"
-                        class="px-3 py-2 rounded-lg cursor-pointer relative group/item transition-all duration-200 text-sm font-medium"
-                        :class="store.currentTemplateId === tpl.id ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'hover:bg-gray-50 text-gray-600'"
+                        class="px-3 py-2 rounded-lg cursor-pointer relative group/item transition-all duration-200 text-sm font-medium flex items-center gap-2"
+                        :class="store.selectedTemplateIds.includes(tpl.id) ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'hover:bg-gray-50 text-gray-600'"
                       >
-                          <span class="truncate block">{{ tpl.name }}</span>
+                          <!-- Checkbox indicator -->
+                          <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
+                               :class="store.selectedTemplateIds.includes(tpl.id) ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'">
+                              <svg v-if="store.selectedTemplateIds.includes(tpl.id)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-white">
+                                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                              </svg>
+                          </div>
+                          <span class="truncate block flex-1">{{ tpl.name }}</span>
                           
                           <!-- Hover Tooltip -->
                           <Teleport to="body">
@@ -228,20 +361,54 @@ function deleteLightTag(tag: string) {
         </Transition>
 
         <div class="flex-1 overflow-y-auto px-8 py-8 custom-scrollbar relative z-0">
-          <!-- Secondary Filter Indicator (if active) -->
-          <div v-if="store.secondaryFilterTags.length > 0" class="mb-6 flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
-              <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Filtering +</span>
-              <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
-                  <span 
-                    v-for="tag in store.secondaryFilterTags" 
-                    :key="tag"
-                    class="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium"
-                  >
-                      {{ tag }}
-                      <button @click="toggleSecondaryTag(tag)" class="hover:text-red-500 rounded-full hover:bg-indigo-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
-                  </span>
-              </TransitionGroup>
-              <button @click="store.secondaryFilterTags = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">Clear All</button>
+          <!-- Filter Indicators -->
+          <div v-if="store.selectedTemplateIds.length > 0 || store.normalTagStagingArea.length > 0 || store.secondaryFilterTags.length > 0" class="mb-6 space-y-2">
+              <!-- Template Filter Indicator -->
+              <div v-if="store.selectedTemplateIds.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
+                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Templates ({{ store.templateFilterMode.toUpperCase() }})</span>
+                  <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
+                      <span 
+                        v-for="tplId in store.selectedTemplateIds" 
+                        :key="tplId"
+                        class="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium"
+                      >
+                          {{ store.templates.find(t => t.id === tplId)?.name || 'Unknown' }}
+                          <button @click="toggleTemplate(tplId)" class="hover:text-red-500 rounded-full hover:bg-indigo-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
+                      </span>
+                  </TransitionGroup>
+              </div>
+              
+              <!-- Normal Tag Staging Area Indicator -->
+              <div v-if="store.normalTagStagingArea.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-purple-100 shadow-sm">
+                  <span class="text-xs font-bold text-purple-400 uppercase tracking-wide mr-2">Tags ({{ store.normalTagFilterMode.toUpperCase() }})</span>
+                  <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
+                      <span 
+                        v-for="tag in store.normalTagStagingArea" 
+                        :key="tag"
+                        class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium"
+                      >
+                          {{ tag }}
+                          <button @click="store.normalTagStagingArea = store.normalTagStagingArea.filter(t => t !== tag)" class="hover:text-red-500 rounded-full hover:bg-purple-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
+                      </span>
+                  </TransitionGroup>
+                  <button @click="store.normalTagStagingArea = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">Clear All</button>
+              </div>
+              
+              <!-- Light Tag Filter Indicator -->
+              <div v-if="store.secondaryFilterTags.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
+                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Light Tags</span>
+                  <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
+                      <span 
+                        v-for="tag in store.secondaryFilterTags" 
+                        :key="tag"
+                        class="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium"
+                      >
+                          {{ tag }}
+                          <button @click="toggleSecondaryTag(tag)" class="hover:text-red-500 rounded-full hover:bg-indigo-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
+                      </span>
+                  </TransitionGroup>
+                  <button @click="store.secondaryFilterTags = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">Clear All</button>
+              </div>
           </div>
 
           <BlockList />
@@ -356,6 +523,14 @@ function deleteLightTag(tag: string) {
         />
     </div>
 
+    <!-- Tag Selector Modal -->
+    <TagSelectorModal
+        :isOpen="showTagSelectorModal"
+        :selectedTags="store.normalTagStagingArea"
+        @close="showTagSelectorModal = false"
+        @confirm="handleTagSelectorConfirm"
+    />
+
   </div>
 </template>
 
@@ -383,5 +558,24 @@ function deleteLightTag(tag: string) {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: rgba(156, 163, 175, 0.5);
+}
+
+/* Expand Transition */
+.expand-enter-active,
+.expand-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.expand-enter-from,
+.expand-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.expand-enter-to,
+.expand-leave-from {
+  max-height: 500px;
+  opacity: 1;
 }
 </style>
