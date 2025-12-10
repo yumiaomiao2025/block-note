@@ -303,6 +303,11 @@ export const useNoteStore = defineStore('note', () => {
     }
   }
 
+  // Helper function to count tag usage in notes
+  function getTagUsageCount(tag: string): number {
+    return notes.value.filter(note => note.tags.includes(tag)).length;
+  }
+
   // Filter & Template Actions
   function setFilterTag(tag: string) {
     if (activeFilter.value.includeTags.includes(tag)) {
@@ -405,6 +410,7 @@ export const useNoteStore = defineStore('note', () => {
     createTemplate,
     updateTemplate,
     deleteTemplate,
-    switchTemplate
+    switchTemplate,
+    getTagUsageCount
   };
 });
