@@ -129,11 +129,11 @@ function toggleStagingArea() {
     isStagingAreaExpanded.value = !isStagingAreaExpanded.value;
 }
 
-function toggleNormalTagInStaging(tag: string) {
-    if (store.normalTagStagingArea.includes(tag)) {
-        store.normalTagStagingArea = store.normalTagStagingArea.filter(t => t !== tag);
+function toggleNormalTagActive(tag: string) {
+    if (store.activeNormalTags.includes(tag)) {
+        store.activeNormalTags = store.activeNormalTags.filter(t => t !== tag);
     } else {
-        store.normalTagStagingArea.push(tag);
+        store.activeNormalTags.push(tag);
     }
 }
 
@@ -196,96 +196,92 @@ function deleteLightTag(tag: string) {
                      </button>
                  </div>
              </div>
-             <!-- AND/OR Toggle -->
-             <div v-if="store.selectedTemplateIds.length > 0" class="flex items-center gap-2 mb-2">
-                 <button
-                   @click="store.templateFilterMode = 'and'"
-                   class="text-xs px-2 py-1 rounded border transition-colors"
-                   :class="store.templateFilterMode === 'and' ? 'bg-indigo-100 text-indigo-700 border-indigo-200 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
-                   title="AND: Notes must match all selected templates"
-                 >
-                   AND
-                 </button>
-                 <button
-                   @click="store.templateFilterMode = 'or'"
-                   class="text-xs px-2 py-1 rounded border transition-colors"
-                   :class="store.templateFilterMode === 'or' ? 'bg-indigo-100 text-indigo-700 border-indigo-200 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
-                   title="OR: Notes must match any selected template"
-                 >
-                   OR
-                 </button>
-                 <span class="text-[10px] text-gray-400 ml-auto">{{ store.selectedTemplateIds.length }} selected</span>
+             <!-- Segmented Control for AND/OR and Selection Count -->
+             <div class="flex items-center justify-between gap-2">
+                 <!-- Segmented Control -->
+                 <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 shadow-sm">
+                     <button
+                         @click="store.tagFilterMode = 'and'"
+                         class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200"
+                         :class="store.tagFilterMode === 'and' 
+                             ? 'bg-white text-indigo-700 shadow-sm' 
+                             : 'text-gray-600 hover:text-gray-900'"
+                         title="AND: Notes must contain all selected tags"
+                     >
+                         AND
+                     </button>
+                     <button
+                         @click="store.tagFilterMode = 'or'"
+                         class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200"
+                         :class="store.tagFilterMode === 'or' 
+                             ? 'bg-white text-indigo-700 shadow-sm' 
+                             : 'text-gray-600 hover:text-gray-900'"
+                         title="OR: Notes must contain any selected tag"
+                     >
+                         OR
+                     </button>
+                 </div>
+                 <span v-if="store.selectedTemplateIds.length > 0" class="text-[10px] text-gray-400">{{ store.selectedTemplateIds.length }} selected</span>
              </div>
         </div>
         <div class="flex-1 overflow-y-auto p-2 space-y-4 custom-scrollbar" :class="{ 'opacity-50 pointer-events-none': !store.isTemplateEnabled }">
              <!-- Normal Tag Staging Area -->
              <div class="border-b border-gray-200 pb-4 mb-4">
-                 <div 
-                     @click="toggleStagingArea"
-                     class="px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 text-sm font-medium flex items-center justify-between hover:bg-gray-50"
-                 >
-                     <div class="flex items-center gap-2">
-                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 transition-transform" :class="{ 'rotate-90': isStagingAreaExpanded }">
-                             <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                         </svg>
-                         <span class="text-gray-700">Tag Staging Area</span>
-                         <span v-if="store.normalTagStagingArea.length > 0" class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">{{ store.normalTagStagingArea.length }}</span>
-                     </div>
-                     <div class="flex items-center gap-1">
-                         <button
-                             @click.stop="store.isNormalTagFilterEnabled = !store.isNormalTagFilterEnabled"
-                             class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
-                             :class="store.isNormalTagFilterEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                             title="Enable/Disable Normal Tag Filter"
-                         >
-                             N
-                         </button>
-                         <button
-                             @click.stop="showTagSelectorModal = true"
-                             class="w-4 h-4 rounded border text-gray-400 border-gray-300 hover:bg-gray-100 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition-colors"
-                             title="Add Tags to Staging Area"
-                         >
-                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-                                 <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                 <div class="px-3 py-2 space-y-2">
+                     <div 
+                         @click="toggleStagingArea"
+                         class="rounded-lg cursor-pointer transition-all duration-200 text-sm font-medium flex items-center justify-between hover:bg-gray-50 -mx-1 px-1"
+                     >
+                         <div class="flex items-center gap-2">
+                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 transition-transform" :class="{ 'rotate-90': isStagingAreaExpanded }">
+                                 <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                              </svg>
-                         </button>
+                             <span class="text-gray-700">Tag Staging Area</span>
+                             <span v-if="store.normalTagStagingArea.length > 0" class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">{{ store.normalTagStagingArea.length }}</span>
+                         </div>
+                         <div class="flex items-center gap-1">
+                             <button
+                                 @click.stop="store.isNormalTagFilterEnabled = !store.isNormalTagFilterEnabled"
+                                 class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
+                                 :class="store.isNormalTagFilterEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
+                                 title="Enable/Disable Normal Tag Filter"
+                             >
+                                 N
+                             </button>
+                             <button
+                                 @click.stop="showTagSelectorModal = true"
+                                 class="w-4 h-4 rounded border text-gray-400 border-gray-300 hover:bg-gray-100 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition-colors"
+                                 title="Add Tags to Staging Area"
+                             >
+                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                                     <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                                 </svg>
+                             </button>
+                         </div>
                      </div>
                  </div>
                  
                  <!-- Expanded Content -->
                  <Transition name="expand">
-                     <div v-if="isStagingAreaExpanded" class="mt-2 space-y-2">
-                         <!-- AND/OR Toggle -->
-                         <div v-if="store.normalTagStagingArea.length > 0" class="flex items-center gap-2 px-3">
-                             <button
-                                 @click="store.normalTagFilterMode = 'and'"
-                                 class="text-xs px-2 py-1 rounded border transition-colors"
-                                 :class="store.normalTagFilterMode === 'and' ? 'bg-purple-100 text-purple-700 border-purple-200 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
-                                 title="AND: Notes must contain all tags"
-                             >
-                                 AND
-                             </button>
-                             <button
-                                 @click="store.normalTagFilterMode = 'or'"
-                                 class="text-xs px-2 py-1 rounded border transition-colors"
-                                 :class="store.normalTagFilterMode === 'or' ? 'bg-purple-100 text-purple-700 border-purple-200 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
-                                 title="OR: Notes must contain any tag"
-                             >
-                                 OR
-                             </button>
-                         </div>
-                         
+                     <div v-if="isStagingAreaExpanded" class="mt-2 px-3">
                          <!-- Staged Tags -->
-                         <div class="flex flex-wrap gap-1.5 px-3">
+                         <div class="flex flex-wrap gap-1.5">
                              <button
                                  v-for="tag in store.normalTagStagingArea"
                                  :key="tag"
-                                 @click="toggleNormalTagInStaging(tag)"
+                                 @click="toggleNormalTagActive(tag)"
                                  class="text-xs px-2 py-1 rounded-md border transition-all flex items-center gap-1"
-                                 :class="store.isNormalTagFilterEnabled ? 'bg-purple-100 text-purple-700 border-purple-200 font-medium' : 'bg-gray-100 text-gray-600 border-gray-200'"
+                                 :class="store.activeNormalTags.includes(tag) 
+                                     ? 'bg-purple-600 text-white border-purple-600 shadow-sm' 
+                                     : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600 hover:shadow-sm'"
                              >
                                  {{ tag }}
-                                 <span class="text-purple-400 hover:text-red-500">&times;</span>
+                                 <button 
+                                     @click.stop="store.normalTagStagingArea = store.normalTagStagingArea.filter(t => t !== tag); store.activeNormalTags = store.activeNormalTags.filter(t => t !== tag)"
+                                     class="ml-1 text-gray-400 hover:text-red-500"
+                                 >
+                                     &times;
+                                 </button>
                              </button>
                              <div v-if="store.normalTagStagingArea.length === 0" class="text-xs text-gray-400 italic">
                                  No tags in staging area. Click the + icon to add tags.
@@ -378,20 +374,20 @@ function deleteLightTag(tag: string) {
                   </TransitionGroup>
               </div>
               
-              <!-- Normal Tag Staging Area Indicator -->
-              <div v-if="store.normalTagStagingArea.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-purple-100 shadow-sm">
-                  <span class="text-xs font-bold text-purple-400 uppercase tracking-wide mr-2">Tags ({{ store.normalTagFilterMode.toUpperCase() }})</span>
+              <!-- Active Normal Tags Indicator -->
+              <div v-if="store.activeNormalTags.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-purple-100 shadow-sm">
+                  <span class="text-xs font-bold text-purple-400 uppercase tracking-wide mr-2">Tags ({{ store.tagFilterMode.toUpperCase() }})</span>
                   <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
                       <span 
-                        v-for="tag in store.normalTagStagingArea" 
+                        v-for="tag in store.activeNormalTags" 
                         :key="tag"
                         class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium"
                       >
                           {{ tag }}
-                          <button @click="store.normalTagStagingArea = store.normalTagStagingArea.filter(t => t !== tag)" class="hover:text-red-500 rounded-full hover:bg-purple-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
+                          <button @click="toggleNormalTagActive(tag)" class="hover:text-red-500 rounded-full hover:bg-purple-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
                       </span>
                   </TransitionGroup>
-                  <button @click="store.normalTagStagingArea = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">Clear All</button>
+                  <button @click="store.activeNormalTags = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">Clear All</button>
               </div>
               
               <!-- Light Tag Filter Indicator -->

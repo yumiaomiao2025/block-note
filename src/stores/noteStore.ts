@@ -26,12 +26,15 @@ export const useNoteStore = defineStore('note', () => {
   
   // Template multi-select
   const selectedTemplateIds = useStorage<string[]>('blocknote-selected-templates', []);
-  const templateFilterMode = useStorage<'and' | 'or'>('blocknote-template-filter-mode', 'and');
   
-  // Normal tag staging area
+  // Normal tag staging area (just for management, not for filtering)
   const normalTagStagingArea = ref<string[]>([]);
+  // Active normal tags (actually used for filtering)
+  const activeNormalTags = ref<string[]>([]);
   const isNormalTagFilterEnabled = useStorage('blocknote-normal-tag-filter-enabled', false);
-  const normalTagFilterMode = useStorage<'and' | 'or'>('blocknote-normal-tag-filter-mode', 'and');
+  
+  // Unified filter mode for all normal tag filtering (templates + staging area)
+  const tagFilterMode = useStorage<'and' | 'or'>('blocknote-tag-filter-mode', 'and');
   
   // Keep currentTemplateId for backward compatibility (will be removed later)
   const currentTemplateId = computed({
@@ -62,43 +65,37 @@ export const useNoteStore = defineStore('note', () => {
   const filteredNotes = computed(() => {
     let result = notes.value;
 
-    // 1. Apply Template Filter (Multi-select with AND/OR mode)
+    // 1. Collect all normal tags to filter (from templates + active staging area tags)
+    const allNormalTagsToFilter = new Set<string>();
+    
+    // Add tags from selected templates
     if (isTemplateEnabled.value && selectedTemplateIds.value.length > 0) {
       const selectedTemplates = templates.value.filter(t => selectedTemplateIds.value.includes(t.id));
-      
-      if (templateFilterMode.value === 'and') {
-        // AND mode: note must contain all tags from all selected templates
-        const allRequiredTags = new Set<string>();
-        selectedTemplates.forEach(template => {
-          template.filterRules.includeTags.forEach(tag => allRequiredTags.add(tag));
-        });
-        result = result.filter(note => {
-          return Array.from(allRequiredTags).every(tag => note.tags.includes(tag));
-        });
-      } else {
-        // OR mode: note must contain all tags from at least one template
-        result = result.filter(note => {
-          return selectedTemplates.some(template => {
-            return template.filterRules.includeTags.every(tag => note.tags.includes(tag));
-          });
-        });
-      }
+      selectedTemplates.forEach(template => {
+        template.filterRules.includeTags.forEach(tag => allNormalTagsToFilter.add(tag));
+      });
     } else if (isTemplateEnabled.value && activeFilter.value.includeTags.length > 0) {
       // Fallback to activeFilter for backward compatibility
-      result = result.filter(note => {
-        return activeFilter.value.includeTags.every(tag => note.tags.includes(tag));
-      });
+      activeFilter.value.includeTags.forEach(tag => allNormalTagsToFilter.add(tag));
     }
-
-    // 2. Apply Normal Tag Staging Area Filter (if enabled)
-    if (isNormalTagFilterEnabled.value && normalTagStagingArea.value.length > 0) {
-      if (normalTagFilterMode.value === 'and') {
+    
+    // Add tags from active staging area
+    if (isNormalTagFilterEnabled.value && activeNormalTags.value.length > 0) {
+      activeNormalTags.value.forEach(tag => allNormalTagsToFilter.add(tag));
+    }
+    
+    // Apply unified filter mode
+    if (allNormalTagsToFilter.size > 0) {
+      const tagsArray = Array.from(allNormalTagsToFilter);
+      if (tagFilterMode.value === 'and') {
+        // AND mode: note must contain all tags
         result = result.filter(note => {
-          return normalTagStagingArea.value.every(tag => note.tags.includes(tag));
+          return tagsArray.every(tag => note.tags.includes(tag));
         });
       } else {
+        // OR mode: note must contain at least one tag
         result = result.filter(note => {
-          return normalTagStagingArea.value.some(tag => note.tags.includes(tag));
+          return tagsArray.some(tag => note.tags.includes(tag));
         });
       }
     }
@@ -444,10 +441,10 @@ export const useNoteStore = defineStore('note', () => {
     isLightFilterEnabled,
     secondaryFilterTags,
     selectedTemplateIds,
-    templateFilterMode,
     normalTagStagingArea,
+    activeNormalTags,
     isNormalTagFilterEnabled,
-    normalTagFilterMode,
+    tagFilterMode,
     currentTemplateId,
     allTags,
     uncategorizedTags,
