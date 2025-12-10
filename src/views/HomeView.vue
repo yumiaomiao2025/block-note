@@ -266,23 +266,22 @@ function deleteLightTag(tag: string) {
                      <div v-if="isStagingAreaExpanded" class="mt-2 px-3">
                          <!-- Staged Tags -->
                          <div class="flex flex-wrap gap-1.5">
-                             <button
+                             <div
                                  v-for="tag in store.normalTagStagingArea"
                                  :key="tag"
-                                 @click="toggleNormalTagActive(tag)"
-                                 class="text-xs px-2 py-1 rounded-md border transition-all flex items-center gap-1"
+                                 class="text-xs px-2 py-1 rounded-md border transition-all flex items-center gap-1 cursor-pointer"
                                  :class="store.activeNormalTags.includes(tag) 
                                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm' 
                                      : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600 hover:shadow-sm'"
                              >
-                                 {{ tag }}
+                                 <span @click="toggleNormalTagActive(tag)" class="flex-1">{{ tag }}</span>
                                  <button 
                                      @click.stop="store.normalTagStagingArea = store.normalTagStagingArea.filter(t => t !== tag); store.activeNormalTags = store.activeNormalTags.filter(t => t !== tag)"
-                                     class="ml-1 text-gray-400 hover:text-red-500"
+                                     class="ml-1 text-gray-400 hover:text-red-500 flex-shrink-0"
                                  >
                                      &times;
                                  </button>
-                             </button>
+                             </div>
                              <div v-if="store.normalTagStagingArea.length === 0" class="text-xs text-gray-400 italic">
                                  No tags in staging area. Click the + icon to add tags.
                              </div>
@@ -361,7 +360,7 @@ function deleteLightTag(tag: string) {
           <div v-if="store.selectedTemplateIds.length > 0 || store.normalTagStagingArea.length > 0 || store.secondaryFilterTags.length > 0" class="mb-6 space-y-2">
               <!-- Template Filter Indicator -->
               <div v-if="store.selectedTemplateIds.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
-                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Templates ({{ store.templateFilterMode.toUpperCase() }})</span>
+                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Templates ({{ store.tagFilterMode.toUpperCase() }})</span>
                   <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
                       <span 
                         v-for="tplId in store.selectedTemplateIds" 

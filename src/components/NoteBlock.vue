@@ -181,37 +181,36 @@ const shouldShowMoreIndicator = computed(() => {
 </script>
 
 <template>
-  <!-- Zen Mode Overlay -->
-  <Teleport to="body">
-      <div v-if="isZenMode" class="fixed inset-0 z-[100] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center p-8 transition-opacity duration-500">
-          <button 
-            @click="toggleZenMode"
-            class="absolute top-8 right-8 text-gray-400 hover:text-gray-800 transition-colors"
-            title="Exit Zen Mode"
-          >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
-                <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
-             </svg>
-          </button>
-          
-          <div class="w-full max-w-3xl h-full flex flex-col">
-              <input 
-                type="text" 
-                :value="note.title"
-                @input="updateTitle"
-                placeholder="Untitled"
-                class="bg-transparent border-none outline-none font-bold text-4xl text-gray-800 placeholder-gray-300 mb-8 text-center"
-              />
-              <textarea
-                v-model="input"
-                class="w-full flex-1 resize-none border-none outline-none bg-transparent text-gray-700 text-xl leading-relaxed p-0 focus:ring-0"
-                placeholder="Type something..."
-              ></textarea>
-          </div>
-      </div>
-  </Teleport>
-
   <div ref="cardRef" class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden group/card relative">
+    <!-- Zen Mode Overlay -->
+    <Teleport to="body">
+        <div v-if="isZenMode" class="fixed inset-0 z-[100] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center p-8 transition-opacity duration-500">
+            <button 
+              @click="toggleZenMode"
+              class="absolute top-8 right-8 text-gray-400 hover:text-gray-800 transition-colors"
+              title="Exit Zen Mode"
+            >
+               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                  <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
+               </svg>
+            </button>
+            
+            <div class="w-full max-w-3xl h-full flex flex-col">
+                <input 
+                  type="text" 
+                  :value="note.title"
+                  @input="updateTitle"
+                  placeholder="Untitled"
+                  class="bg-transparent border-none outline-none font-bold text-4xl text-gray-800 placeholder-gray-300 mb-8 text-center"
+                />
+                <textarea
+                  v-model="input"
+                  class="w-full flex-1 resize-none border-none outline-none bg-transparent text-gray-700 text-xl leading-relaxed p-0 focus:ring-0"
+                  placeholder="Type something..."
+                ></textarea>
+            </div>
+        </div>
+    </Teleport>
     
     <!-- Header -->
     <div class="flex items-center p-2 px-3 bg-gray-50 border-b border-gray-100 group">
@@ -399,32 +398,32 @@ const shouldShowMoreIndicator = computed(() => {
       </div>
 
     </div>
-  </div>
-  
-  <!-- More Tags Tooltip -->
-  <Teleport to="body">
-    <div 
-      v-if="showMoreTagsTooltip && remainingLightTags.length > 0"
-      ref="moreTagsTooltipRef"
-      class="fixed z-[9999] bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl backdrop-blur pointer-events-auto transition-opacity duration-200 max-w-xs"
-      :style="moreTagsTooltipStyle"
-    >
-      <div class="font-bold mb-2 border-b border-white/10 pb-1 text-gray-300">剩余标签</div>
-      <div class="flex flex-wrap gap-1.5">
-        <span 
-          v-for="tag in remainingLightTags" 
-          :key="tag"
-          class="text-[11px] text-gray-300 hover:text-white transition-colors cursor-default select-none bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded flex items-center gap-1 group/tag border border-transparent hover:border-white/20"
-        >
-          {{ tag }}
-          <button 
-            @click="removeLightTag(tag)"
-            class="text-gray-400 hover:text-red-400 opacity-0 group-hover/tag:opacity-100 transition-opacity"
+    
+    <!-- More Tags Tooltip -->
+    <Teleport to="body">
+      <div 
+        v-if="showMoreTagsTooltip && remainingLightTags.length > 0"
+        ref="moreTagsTooltipRef"
+        class="fixed z-[9999] bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl backdrop-blur pointer-events-auto transition-opacity duration-200 max-w-xs"
+        :style="moreTagsTooltipStyle"
+      >
+        <div class="font-bold mb-2 border-b border-white/10 pb-1 text-gray-300">剩余标签</div>
+        <div class="flex flex-wrap gap-1.5">
+          <span 
+            v-for="tag in remainingLightTags" 
+            :key="tag"
+            class="text-[11px] text-gray-300 hover:text-white transition-colors cursor-default select-none bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded flex items-center gap-1 group/tag border border-transparent hover:border-white/20"
           >
-            &times;
-          </button>
-        </span>
+            {{ tag }}
+            <button 
+              @click="removeLightTag(tag)"
+              class="text-gray-400 hover:text-red-400 opacity-0 group-hover/tag:opacity-100 transition-opacity"
+            >
+              &times;
+            </button>
+          </span>
+        </div>
       </div>
-    </div>
-  </Teleport>
+    </Teleport>
+  </div>
 </template>
