@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
-import { useUIStore } from '../stores/uiStore';
 
 const store = useNoteStore();
-const uiStore = useUIStore();
 
 const selectedTemplateId = ref<string | null>(null);
 const newTemplateName = ref('');
@@ -86,15 +84,6 @@ function toggleTag(tag: string) {
     }
 }
 
-// --- Theme Actions ---
-function captureTheme() {
-    if (!selectedTemplate.value) return;
-    if (confirm("Update this template to use the currently active UI theme?")) {
-        store.updateTemplate(selectedTemplate.value.id, {
-             themeConfig: JSON.parse(JSON.stringify(uiStore.currentConfig))
-        });
-    }
-}
 </script>
 
 <template>
@@ -166,9 +155,6 @@ function captureTheme() {
                               />
                           </div>
                       </div>
-                      <button @click="captureTheme" class="text-xs border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 text-gray-600">
-                          Capture Current Theme
-                      </button>
                   </div>
               </div>
 

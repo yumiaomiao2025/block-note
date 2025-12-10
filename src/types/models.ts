@@ -56,7 +56,5 @@ export interface FilterTemplate {
   name: string;
   group?: string; // Template group name
   filterRules: FilterRules;
-  // Theme config bound to this template
-  themeConfig?: UIThemeConfig;
   associatedTagGroups?: string[]; // IDs of TagGroups
 }

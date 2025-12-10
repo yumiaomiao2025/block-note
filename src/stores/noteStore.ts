@@ -325,18 +325,13 @@ export const useNoteStore = defineStore('note', () => {
   function clearFilter() {
     activeFilter.value.includeTags = [];
     currentTemplateId.value = null;
-    // Reset UI to default when clearing filter (optional, but makes sense to exit "theme mode")
-    const uiStore = useUIStore();
-    uiStore.currentConfig = JSON.parse(JSON.stringify(uiStore.defaultConfig));
   }
 
   function createTemplate(name: string, associatedTagGroups: string[] = []) {
-    const uiStore = useUIStore();
     const newTemplate: FilterTemplate = {
       id: uuidv4(),
       name,
       filterRules: JSON.parse(JSON.stringify(activeFilter.value)),
-      themeConfig: JSON.parse(JSON.stringify(uiStore.currentConfig)),
       associatedTagGroups
     };
     templates.value.push(newTemplate);
@@ -365,12 +360,6 @@ export const useNoteStore = defineStore('note', () => {
     if (template) {
       activeFilter.value = JSON.parse(JSON.stringify(template.filterRules));
       currentTemplateId.value = id;
-      
-      // Apply Theme if exists
-      if (template.themeConfig) {
-        const uiStore = useUIStore();
-        uiStore.currentConfig = JSON.parse(JSON.stringify(template.themeConfig));
-      }
     }
   }
 
