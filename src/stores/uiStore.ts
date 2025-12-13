@@ -11,6 +11,9 @@ export const useUIStore = defineStore('ui', () => {
   const showNormalTags = useStorage('blocknote-show-normal-tags', true);
   const showLightTags = useStorage('blocknote-show-light-tags', true);
   const lightTagDisplayLimit = useStorage('blocknote-light-tag-display-limit', 5);
+  
+  // Quick Preview Mode
+  const quickPreviewMode = useStorage('blocknote-quick-preview-mode', false);
 
   const defaultConfig: UIThemeConfig = {
     layout: {
@@ -102,6 +105,7 @@ export const useUIStore = defineStore('ui', () => {
     showNormalTags,
     showLightTags,
     lightTagDisplayLimit,
+    quickPreviewMode,
     currentConfig,
     defaultConfig,
     confirmDialog,

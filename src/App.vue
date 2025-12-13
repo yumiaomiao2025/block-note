@@ -69,8 +69,20 @@ const appStyles = computed(() => {
             </button>
         </div>
 
-        <div v-if="activeTab === 'home'">
-             <button 
+        <div v-if="activeTab === 'home'" class="flex items-center gap-2">
+            <button 
+                @click="uiStore.quickPreviewMode = !uiStore.quickPreviewMode"
+                class="text-xs font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow focus:outline-none flex items-center gap-1.5"
+                :class="uiStore.quickPreviewMode ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
+                title="快捷预览"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                    <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                    <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 8.201 2.665 9.336 6.404.18.596.18 1.23 0 1.826C18.201 15.015 14.257 17.68 10 17.68c-4.257 0-8.201-2.665-9.336-6.404.18-.596.18-1.23 0 1.826zM10 14.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd" />
+                </svg>
+                快捷预览
+            </button>
+            <button 
                 @click="uiStore.toggleEditMode"
                 class="text-xs font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow focus:outline-none"
                 :class="uiStore.isEditing ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-500 hover:bg-gray-50'"
