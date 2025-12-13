@@ -354,7 +354,7 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
       <!-- Left Sidebar: Groups -->
       <div class="w-64 border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
           <div class="p-4 border-b border-gray-200 bg-white">
-              <h2 class="font-bold text-lg text-gray-800">Groups</h2>
+              <h2 class="font-bold text-lg text-gray-800">{{ t('tagManager.groups') }}</h2>
               <div class="mt-2 flex gap-2">
                   <input 
                     v-model="newGroupName" 
@@ -381,7 +381,7 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 opacity-70">
                         <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
                       </svg>
-                      <span :class="matchesSearch('Uncategorized') ? 'bg-yellow-200 px-1 rounded' : ''">Uncategorized</span>
+                      <span :class="matchesSearch(t('common.uncategorized')) ? 'bg-yellow-200 px-1 rounded' : ''">{{ t('common.uncategorized') }}</span>
                   </div>
                   <span class="text-xs bg-white/50 px-1.5 rounded-full text-gray-600">{{ store.uncategorizedTags.length }}</span>
               </div>
@@ -489,9 +489,9 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                   <div>
                       <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
                           {{ selectedGroupName }}
-                          <span class="text-sm font-normal text-gray-500 ml-2 bg-gray-100 px-2 py-0.5 rounded-full">{{ displayedTags.length }} tags</span>
+                          <span class="text-sm font-normal text-gray-500 ml-2 bg-gray-100 px-2 py-0.5 rounded-full">{{ displayedTags.length }} {{ t('tagManager.tagsCount') }}</span>
                       </h1>
-                      <p class="text-sm text-gray-500 mt-1">Manage tags for this group.</p>
+                      <p class="text-sm text-gray-500 mt-1">{{ t('tagManager.manageTagsForGroup') }}</p>
                   </div>
                   
                   <div class="flex items-center gap-2">
@@ -514,9 +514,9 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-16 h-16 mb-4 opacity-20">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a22.53 22.53 0 003.744-3.744c.542-.826.369-1.908-.33-2.607L9.568 3z" />
                   </svg>
-                  <p class="text-lg font-medium text-gray-500">No tags here yet</p>
-                  <p class="text-sm mt-1" v-if="selectedGroupId === 'uncategorized'">All your tags are neatly organized in groups!</p>
-                  <p class="text-sm mt-1" v-else>Drag uncategorized tags here or create a new one.</p>
+                  <p class="text-lg font-medium text-gray-500">{{ t('tagManager.noTagsHereYet') }}</p>
+                  <p class="text-sm mt-1" v-if="selectedGroupId === 'uncategorized'">{{ t('tagManager.allTagsOrganized') }}</p>
+                  <p class="text-sm mt-1" v-else>{{ t('tagManager.dragUncategorizedTags') }}</p>
               </div>
               
               <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 auto-rows-min">

@@ -2,8 +2,10 @@
 import { useNoteStore } from '../stores/noteStore';
 import NoteBlock from './NoteBlock.vue';
 import { onMounted } from 'vue';
+import { useI18n } from '../composables/useI18n';
 
 const store = useNoteStore();
+const { t } = useI18n();
 
 onMounted(() => {
   // Auto-add a note if list is empty for better first-time experience
@@ -30,8 +32,8 @@ onMounted(() => {
 
     <!-- Empty State for Filter -->
     <div v-if="store.filteredNotes.length === 0 && store.notes.length > 0" class="text-center py-12 text-gray-400">
-      <p>No notes match your filter.</p>
-      <button @click="store.clearFilter" class="text-indigo-500 hover:underline mt-2 text-sm">Clear filter</button>
+      <p>{{ t('blockList.noNotesMatchFilter') }}</p>
+      <button @click="store.clearFilter" class="text-indigo-500 hover:underline mt-2 text-sm">{{ t('blockList.clearFilter') }}</button>
     </div>
     
     <!-- Add New Block Button (Inline) -->
@@ -39,12 +41,12 @@ onMounted(() => {
       <button
         @click="store.addNote"
         class="w-full py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/30 transition-all duration-200 flex items-center justify-center gap-2 group"
-        title="Add new block"
+        :title="t('blockList.addNewBlock')"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 group-hover:scale-110 transition-transform duration-200">
           <path fill-rule="evenodd" d="M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z" clip-rule="evenodd" />
         </svg>
-        <span class="font-semibold text-lg">New Note</span>
+        <span class="font-semibold text-lg">{{ t('blockList.newNote') }}</span>
       </button>
     </div>
   </div>

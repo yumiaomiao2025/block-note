@@ -111,7 +111,7 @@ async function exportCard() {
       });
       
       const link = document.createElement('a');
-      link.download = `note-${props.note.title || 'untitled'}.png`;
+      link.download = `note-${props.note.title || t('placeholder.untitled')}.png`;
       link.href = dataUrl;
       link.click();
     } catch (error) {
@@ -190,7 +190,7 @@ const shouldShowMoreIndicator = computed(() => {
             <button 
               @click="toggleZenMode"
               class="absolute top-8 right-8 text-gray-400 hover:text-gray-800 transition-colors"
-              title="Exit Zen Mode"
+              :title="t('noteBlock.exitZenMode')"
             >
                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
                   <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
@@ -202,13 +202,13 @@ const shouldShowMoreIndicator = computed(() => {
                   type="text" 
                   :value="note.title"
                   @input="updateTitle"
-                  placeholder="Untitled"
+                  :placeholder="t('placeholder.untitled')"
                   class="bg-transparent border-none outline-none font-bold text-4xl text-gray-800 placeholder-gray-300 mb-8 text-center"
                 />
                 <textarea
                   v-model="input"
                   class="w-full flex-1 resize-none border-none outline-none bg-transparent text-gray-700 text-xl leading-relaxed p-0 focus:ring-0"
-                  placeholder="Type something..."
+                  :placeholder="t('placeholder.typeSomething')"
                 ></textarea>
             </div>
         </div>
@@ -232,7 +232,7 @@ const shouldShowMoreIndicator = computed(() => {
         type="text" 
         :value="note.title"
         @input="updateTitle"
-        placeholder="Untitled"
+        :placeholder="t('placeholder.untitled')"
         class="flex-1 bg-transparent border-none outline-none font-semibold text-gray-700 placeholder-gray-400 text-sm"
       />
       
@@ -241,7 +241,7 @@ const shouldShowMoreIndicator = computed(() => {
           <button 
               @click="exportCard"
               class="text-gray-300 hover:text-indigo-500 opacity-0 group-hover/card:opacity-100 transition-all p-1"
-              title="Export"
+              :title="t('noteBlock.export')"
               v-if="!note.isCollapsed"
           >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
@@ -253,7 +253,7 @@ const shouldShowMoreIndicator = computed(() => {
           <button 
             @click="toggleZenMode"
             class="text-gray-300 hover:text-indigo-500 opacity-0 group-hover/card:opacity-100 transition-all p-1"
-            title="Zen Mode"
+            :title="t('noteBlock.zenMode')"
           >
              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
                 <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
@@ -278,7 +278,7 @@ const shouldShowMoreIndicator = computed(() => {
         ref="textarea"
         v-model="input"
         class="w-full resize-none border-none outline-none bg-transparent text-gray-700 leading-relaxed text-base p-0 focus:ring-0"
-        placeholder="Type something..."
+        :placeholder="t('placeholder.typeSomething')"
         rows="1"
       ></textarea>
 
@@ -307,7 +307,7 @@ const shouldShowMoreIndicator = computed(() => {
                 @keydown.enter.prevent="handleAddTag"
                 @blur="handleAddTag"
                 type="text" 
-                placeholder="tag" 
+                :placeholder="t('placeholder.tag')" 
                 class="bg-gray-50 hover:bg-white focus:bg-white border border-transparent hover:border-gray-200 focus:border-indigo-300 text-xs rounded-full pl-4 pr-2 py-1 w-20 focus:w-32 transition-all outline-none text-gray-600 placeholder-gray-400"
               />
             </div>
@@ -319,7 +319,7 @@ const shouldShowMoreIndicator = computed(() => {
                 ref="normalSelectorBtnRef"
                 @click.stop="showNormalSelector = !showNormalSelector"
                 class="text-gray-300 hover:text-indigo-500 p-1 rounded-full transition-colors"
-                title="Quick Add Tag/Template"
+                :title="t('noteBlock.quickAddTag')"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
                   <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
@@ -370,7 +370,7 @@ const shouldShowMoreIndicator = computed(() => {
                     @keydown.enter.prevent="handleAddLightTag"
                     @blur="handleAddLightTag"
                     type="text" 
-                    placeholder="+light tag" 
+                    :placeholder="t('placeholder.lightTag')" 
                     class="bg-transparent hover:bg-gray-50 focus:bg-white border border-transparent hover:border-gray-200 focus:border-gray-300 text-[11px] rounded-full px-2 py-0.5 w-20 focus:w-28 transition-all outline-none text-gray-500 placeholder-gray-300"
                  />
              </div>
@@ -382,7 +382,7 @@ const shouldShowMoreIndicator = computed(() => {
                 ref="lightSelectorBtnRef"
                 @click.stop="showLightSelector = !showLightSelector"
                 class="text-gray-300 hover:text-indigo-500 p-1 rounded-full transition-colors"
-                title="Quick Add Light Tag"
+                :title="t('noteBlock.quickAddLightTag')"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
                   <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />

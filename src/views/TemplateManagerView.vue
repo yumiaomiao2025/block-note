@@ -219,7 +219,7 @@ function batchChangeGroup(groupName: string) {
                       @click="showStats = !showStats"
                       class="w-6 h-6 rounded border text-[10px] flex items-center justify-center transition-colors"
                       :class="showStats ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                      title="Show/Hide Statistics"
+                      :title="t('templateManager.showHideStatistics')"
                   >
                       #
                   </button>
@@ -227,7 +227,7 @@ function batchChangeGroup(groupName: string) {
               <div class="mt-2 flex gap-2">
                   <input 
                     v-model="newTemplateName" 
-                    placeholder="New Template Name"
+                    :placeholder="t('placeholder.newTemplateName')"
                     class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
                     @keydown.enter="createTemplate"
                   />
@@ -237,7 +237,7 @@ function batchChangeGroup(groupName: string) {
               <div class="mt-2">
                   <input 
                     v-model="searchQuery" 
-                    placeholder="Search templates..."
+                    :placeholder="t('placeholder.searchTemplates')"
                     class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
                   />
               </div>
@@ -247,10 +247,10 @@ function batchChangeGroup(groupName: string) {
                     v-model="templateSortOrder"
                     class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
                   >
-                      <option value="manual">Manual Order</option>
-                      <option value="name">Name (A-Z)</option>
-                      <option value="usage">Usage (High to Low)</option>
-                      <option value="time">Time (Newest First)</option>
+                      <option value="manual">{{ t('templateManager.sortManual') }}</option>
+                      <option value="name">{{ t('templateManager.sortName') }}</option>
+                      <option value="usage">{{ t('templateManager.sortUsage') }}</option>
+                      <option value="time">{{ t('templateManager.sortTime') }}</option>
                   </select>
               </div>
               <!-- Batch Mode Toggle -->
@@ -260,22 +260,22 @@ function batchChangeGroup(groupName: string) {
                       class="text-xs px-2 py-1 rounded border transition-colors"
                       :class="isBatchMode ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
                   >
-                      {{ isBatchMode ? 'Exit Batch' : 'Batch Mode' }}
+                      {{ isBatchMode ? t('templateManager.exitBatch') : t('templateManager.batchMode') }}
                   </button>
                   <div v-if="isBatchMode" class="flex gap-1">
                       <button
                           @click="selectAllTemplates"
                           class="text-xs px-1.5 py-0.5 rounded border bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                          title="Select All"
+                          :title="t('templateManager.selectAll')"
                       >
-                          All
+                          {{ t('templateManager.all') }}
                       </button>
                       <button
                           @click="deselectAllTemplates"
                           class="text-xs px-1.5 py-0.5 rounded border bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                          title="Deselect All"
+                          :title="t('templateManager.deselectAll')"
                       >
-                          None
+                          {{ t('templateManager.none') }}
                       </button>
                   </div>
               </div>
@@ -291,7 +291,7 @@ function batchChangeGroup(groupName: string) {
                       <input
                           v-model="batchGroupName"
                           @keydown.enter="batchChangeGroup(batchGroupName)"
-                          placeholder="Group name..."
+                          :placeholder="t('placeholder.groupName')"
                           class="flex-1 text-xs border rounded px-1.5 py-0.5"
                       />
                       <button
@@ -334,7 +334,7 @@ function batchChangeGroup(groupName: string) {
                               </span>
                           </div>
                           <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button @click.stop="duplicateTemplate(tpl.id)" class="text-gray-400 hover:text-indigo-600 p-1" title="Duplicate">
+                              <button @click.stop="duplicateTemplate(tpl.id)" class="text-gray-400 hover:text-indigo-600 p-1" :title="t('templateManager.duplicate')">
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
                                       <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
                                       <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z" />
