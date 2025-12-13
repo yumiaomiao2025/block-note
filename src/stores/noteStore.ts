@@ -36,6 +36,9 @@ export const useNoteStore = defineStore('note', () => {
   // Unified filter mode for all normal tag filtering (templates + staging area)
   const tagFilterMode = useStorage<'and' | 'or'>('blocknote-tag-filter-mode', 'and');
   
+  // Filter mode for light tags (secondary filter)
+  const lightTagFilterMode = useStorage<'and' | 'or'>('blocknote-light-tag-filter-mode', 'and');
+  
   // Keep currentTemplateId for backward compatibility (will be removed later)
   const currentTemplateId = computed({
     get: () => selectedTemplateIds.value.length === 1 ? selectedTemplateIds.value[0] : null,
@@ -104,7 +107,13 @@ export const useNoteStore = defineStore('note', () => {
     if (isLightFilterEnabled.value && secondaryFilterTags.value.length > 0) {
         result = result.filter(note => {
             // Check lightTags specifically. Note: existing notes might not have lightTags initialized.
-            return secondaryFilterTags.value.every(tag => note.lightTags?.includes(tag));
+            if (lightTagFilterMode.value === 'and') {
+                // AND mode: note must contain all selected light tags
+                return secondaryFilterTags.value.every(tag => note.lightTags?.includes(tag));
+            } else {
+                // OR mode: note must contain at least one selected light tag
+                return secondaryFilterTags.value.some(tag => note.lightTags?.includes(tag));
+            }
         });
     }
     
@@ -445,6 +454,7 @@ export const useNoteStore = defineStore('note', () => {
     activeNormalTags,
     isNormalTagFilterEnabled,
     tagFilterMode,
+    lightTagFilterMode,
     currentTemplateId,
     allTags,
     uncategorizedTags,

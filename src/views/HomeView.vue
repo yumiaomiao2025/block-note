@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue';
+import { useStorage } from '@vueuse/core';
 import BlockList from '../components/BlockList.vue';
 import UIConfigPanel from '../components/UIConfigPanel.vue';
 import LightTagSettingsPopover from '../components/LightTagSettingsPopover.vue';
@@ -99,12 +100,21 @@ const topTags = computed(() => {
         }
     });
     
-    // 按使用频率排序，但只返回系统中存在的标签
-    return systemTags
-        .map(tag => [tag, counts.get(tag) || 0] as [string, number])
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 30)
-        .map(e => e[0]);
+    // 根据排序模式进行排序
+    if (lightTagSortMode.value === 'alphabetical') {
+        // 按字母顺序排序
+        return systemTags
+            .slice()
+            .sort((a, b) => a.localeCompare(b))
+            .slice(0, 30);
+    } else {
+        // 按使用频率排序（默认）
+        return systemTags
+            .map(tag => [tag, counts.get(tag) || 0] as [string, number])
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 30)
+            .map(e => e[0]);
+    }
 });
 
 function toggleSecondaryTag(tag: string) {
@@ -116,6 +126,10 @@ function toggleSecondaryTag(tag: string) {
 }
 
 const isEditingLightTags = ref(false);
+const newLightTagInput = ref('');
+
+// Light Tag Sort Mode
+const lightTagSortMode = useStorage<'frequency' | 'alphabetical'>('blocknote-light-tag-sort-mode', 'frequency');
 
 // Light Tag Settings
 const showLightTagSettings = ref(false);
@@ -161,6 +175,28 @@ function deleteLightTag(tag: string) {
         if (store.secondaryFilterTags.includes(tag)) {
             toggleSecondaryTag(tag);
         }
+    }
+}
+
+function addLightTagToSystem() {
+    const trimmedTag = newLightTagInput.value.trim();
+    if (!trimmedTag) {
+        newLightTagInput.value = '';
+        return;
+    }
+    
+    // Check if tag already exists in system
+    if (!store.lightTagSystem.includes(trimmedTag)) {
+        store.lightTagSystem.push(trimmedTag);
+    }
+    
+    newLightTagInput.value = '';
+}
+
+function handleNewLightTagKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        addLightTagToSystem();
     }
 }
 
@@ -391,7 +427,7 @@ function deleteLightTag(tag: string) {
               
               <!-- Light Tag Filter Indicator -->
               <div v-if="store.secondaryFilterTags.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
-                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Light Tags</span>
+                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Light Tags ({{ store.lightTagFilterMode.toUpperCase() }})</span>
                   <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
                       <span 
                         v-for="tag in store.secondaryFilterTags" 
@@ -457,6 +493,60 @@ function deleteLightTag(tag: string) {
                  </div>
              </div>
              
+             <!-- Segmented Control for AND/OR -->
+             <div class="flex items-center justify-between gap-2">
+                 <!-- Segmented Control -->
+                 <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 shadow-sm">
+                     <button
+                         @click="store.lightTagFilterMode = 'and'"
+                         class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200"
+                         :class="store.lightTagFilterMode === 'and' 
+                             ? 'bg-white text-indigo-700 shadow-sm' 
+                             : 'text-gray-600 hover:text-gray-900'"
+                         title="AND: Notes must contain all selected light tags"
+                     >
+                         AND
+                     </button>
+                     <button
+                         @click="store.lightTagFilterMode = 'or'"
+                         class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200"
+                         :class="store.lightTagFilterMode === 'or' 
+                             ? 'bg-white text-indigo-700 shadow-sm' 
+                             : 'text-gray-600 hover:text-gray-900'"
+                         title="OR: Notes must contain any selected light tag"
+                     >
+                         OR
+                     </button>
+                 </div>
+             </div>
+             
+             <!-- Sort Mode Control -->
+             <div class="flex items-center justify-between gap-2">
+                 <span class="text-[10px] text-gray-500">排序</span>
+                 <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 shadow-sm">
+                     <button
+                         @click="lightTagSortMode = 'frequency'"
+                         class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200"
+                         :class="lightTagSortMode === 'frequency' 
+                             ? 'bg-white text-indigo-700 shadow-sm' 
+                             : 'text-gray-600 hover:text-gray-900'"
+                         title="按使用频率排序"
+                     >
+                         频率
+                     </button>
+                     <button
+                         @click="lightTagSortMode = 'alphabetical'"
+                         class="px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200"
+                         :class="lightTagSortMode === 'alphabetical' 
+                             ? 'bg-white text-indigo-700 shadow-sm' 
+                             : 'text-gray-600 hover:text-gray-900'"
+                         title="按字母顺序排序"
+                     >
+                         字母
+                     </button>
+                 </div>
+             </div>
+             
              <div class="flex justify-end">
                  <button 
                     @click="isEditingLightTags = !isEditingLightTags"
@@ -501,7 +591,21 @@ function deleteLightTag(tag: string) {
                     </button>
                 </div>
 
-                <div v-if="topTags.length === 0" class="text-xs text-gray-400 w-full text-center mt-8 flex flex-col items-center gap-2">
+                <!-- Add New Tag Input (Always shown in edit mode) -->
+                <div v-if="isEditingLightTags" class="relative">
+                    <input 
+                        v-model="newLightTagInput"
+                        @keydown="handleNewLightTagKeydown"
+                        @blur="addLightTagToSystem"
+                        type="text" 
+                        placeholder="Add new light tag..."
+                        class="text-xs px-2.5 py-1 rounded-md border-dashed border-gray-300 bg-white text-gray-600 cursor-default focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all inline-block"
+                        style="min-width: 120px; width: auto;"
+                    />
+                </div>
+
+                <!-- Empty State: Show message only in normal mode when no tags -->
+                <div v-if="topTags.length === 0 && !isEditingLightTags" class="text-xs text-gray-400 w-full text-center mt-8 flex flex-col items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 opacity-30">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a22.53 22.53 0 003.744-3.744c.542-.826.369-1.908-.33-2.607L9.568 3z" />
                     </svg>
