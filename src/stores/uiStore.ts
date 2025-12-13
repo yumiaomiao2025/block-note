@@ -7,6 +7,9 @@ import { v4 as uuidv4 } from 'uuid';
 export const useUIStore = defineStore('ui', () => {
   const isEditing = ref(false);
   
+  // Language setting
+  const language = useStorage<'zh' | 'en'>('blocknote-language', 'zh');
+  
   // UI Visibility States for Tags
   const showNormalTags = useStorage('blocknote-show-normal-tags', true);
   const showLightTags = useStorage('blocknote-show-light-tags', true);
@@ -100,8 +103,13 @@ export const useUIStore = defineStore('ui', () => {
     confirmDialog.value.isOpen = false;
   }
 
+  function setLanguage(lang: 'zh' | 'en') {
+    language.value = lang;
+  }
+
   return {
     isEditing,
+    language,
     showNormalTags,
     showLightTags,
     lightTagDisplayLimit,
@@ -114,6 +122,7 @@ export const useUIStore = defineStore('ui', () => {
     addDecoration,
     removeDecoration,
     showConfirm,
-    closeConfirm
+    closeConfirm,
+    setLanguage
   };
 });

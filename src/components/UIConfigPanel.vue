@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { useUIStore } from '../stores/uiStore';
+import { useI18n } from '../composables/useI18n';
 
 const uiStore = useUIStore();
+const { t } = useI18n();
 </script>
 
 <template>
   <div class="fixed right-4 top-20 w-64 bg-white/90 backdrop-blur shadow-xl rounded-lg border border-gray-200 p-4 z-50 transition-all"
     v-if="uiStore.isEditing"
   >
-    <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">UI Editor</h3>
+    <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">{{ t('uiConfig.uiEditor') }}</h3>
     
     <div class="space-y-4 text-sm">
       <!-- Background Color -->
       <div>
-        <label class="block text-gray-600 mb-1">App Background</label>
+        <label class="block text-gray-600 mb-1">{{ t('uiConfig.appBackground') }}</label>
         <div class="flex gap-2">
           <input type="color" v-model="uiStore.currentConfig.style.appBackgroundColor" class="h-8 w-8 rounded cursor-pointer border border-gray-300" />
           <input type="text" v-model="uiStore.currentConfig.style.appBackgroundColor" class="flex-1 border rounded px-2 text-gray-600" />
@@ -22,7 +24,7 @@ const uiStore = useUIStore();
 
       <!-- Block Width -->
       <div>
-        <label class="block text-gray-600 mb-1">Block Width (px)</label>
+        <label class="block text-gray-600 mb-1">{{ t('uiConfig.blockWidth') }}</label>
         <input 
           type="range" 
           min="300" 
@@ -35,7 +37,7 @@ const uiStore = useUIStore();
 
       <!-- Border Radius -->
       <div>
-        <label class="block text-gray-600 mb-1">Block Radius (px)</label>
+        <label class="block text-gray-600 mb-1">{{ t('uiConfig.blockRadius') }}</label>
         <input 
           type="range" 
           min="0" 
@@ -48,7 +50,7 @@ const uiStore = useUIStore();
 
        <!-- Tag Color -->
        <div>
-        <label class="block text-gray-600 mb-1">Tag Color</label>
+        <label class="block text-gray-600 mb-1">{{ t('uiConfig.tagColor') }}</label>
         <div class="flex gap-2">
           <input type="color" v-model="uiStore.currentConfig.style.tagColor" class="h-8 w-8 rounded cursor-pointer border border-gray-300" />
           <input type="text" v-model="uiStore.currentConfig.style.tagColor" class="flex-1 border rounded px-2 text-gray-600" />

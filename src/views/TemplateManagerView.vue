@@ -5,9 +5,11 @@ import { useUIStore } from '../stores/uiStore';
 import HoverPreviewPopover from '../components/HoverPreviewPopover.vue';
 import { v4 as uuidv4 } from 'uuid';
 import type { FilterTemplate } from '../types/models';
+import { useI18n } from '../composables/useI18n';
 
 const store = useNoteStore();
 const uiStore = useUIStore();
+const { t } = useI18n();
 
 const selectedTemplateId = ref<string | null>(null);
 const newTemplateName = ref('');
@@ -24,9 +26,10 @@ const hoveredTemplate = ref<FilterTemplate | null>(null);
 
 // --- Computed ---
 const groupedTemplates = computed(() => {
-    const groups: Record<string, typeof store.templates> = { 'General': [] };
+    const generalKey = t('common.general');
+    const groups: Record<string, typeof store.templates> = { [generalKey]: [] };
     store.templates.forEach(t => {
-        const g = t.group || 'General';
+        const g = t.group || generalKey;
         if (!groups[g]) groups[g] = [];
         groups[g].push(t);
     });
@@ -37,8 +40,9 @@ const groupNames = computed(() => {
     const keys = Object.keys(groupedTemplates.value);
     // Ensure General is first
     return keys.sort((a, b) => {
-        if (a === 'General') return -1;
-        if (b === 'General') return 1;
+        const generalKey = t('common.general');
+        if (a === generalKey) return -1;
+        if (b === generalKey) return 1;
         return a.localeCompare(b);
     });
 });
@@ -75,9 +79,10 @@ const filteredTemplates = computed(() => {
 });
 
 const groupedFilteredTemplates = computed(() => {
-    const groups: Record<string, typeof filteredTemplates.value> = { 'General': [] };
+    const generalKey = t('common.general');
+    const groups: Record<string, typeof filteredTemplates.value> = { [generalKey]: [] };
     filteredTemplates.value.forEach(t => {
-        const g = t.group || 'General';
+        const g = t.group || generalKey;
         if (!groups[g]) groups[g] = [];
         groups[g].push(t);
     });
@@ -87,8 +92,9 @@ const groupedFilteredTemplates = computed(() => {
 const groupNamesFiltered = computed(() => {
     const keys = Object.keys(groupedFilteredTemplates.value);
     return keys.sort((a, b) => {
-        if (a === 'General') return -1;
-        if (b === 'General') return 1;
+        const generalKey = t('common.general');
+        if (a === generalKey) return -1;
+        if (b === generalKey) return 1;
         return a.localeCompare(b);
     });
 });
@@ -105,7 +111,7 @@ function createTemplate() {
 }
 
 function deleteTemplate(id: string) {
-    if (confirm('Delete this template?')) {
+    if (confirm(t('templateManager.deleteTemplate'))) {
         store.deleteTemplate(id);
         if (selectedTemplateId.value === id) {
             selectedTemplateId.value = null;
@@ -179,7 +185,7 @@ function deselectAllTemplates() {
 
 function batchDelete() {
     if (selectedTemplateIdsForBatch.value.size === 0) return;
-    if (confirm(`Delete ${selectedTemplateIdsForBatch.value.size} template(s)?`)) {
+    if (confirm(t('templateManager.deleteTemplates', { count: selectedTemplateIdsForBatch.value.size }))) {
         selectedTemplateIdsForBatch.value.forEach(id => {
             store.deleteTemplate(id);
         });
@@ -208,7 +214,7 @@ function batchChangeGroup(groupName: string) {
       <div class="w-64 border-r border-gray-200 bg-gray-50 flex flex-col shrink-0">
           <div class="p-4 border-b border-gray-200 bg-white">
               <div class="flex items-center justify-between mb-2">
-                  <h2 class="font-bold text-lg text-gray-800">Templates</h2>
+                  <h2 class="font-bold text-lg text-gray-800">{{ t('templateManager.templates') }}</h2>
                   <button
                       @click="showStats = !showStats"
                       class="w-6 h-6 rounded border text-[10px] flex items-center justify-center transition-colors"
@@ -279,7 +285,7 @@ function batchChangeGroup(groupName: string) {
                       @click="batchDelete"
                       class="w-full text-xs px-2 py-1 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
                   >
-                      Delete ({{ selectedTemplateIdsForBatch.size }})
+                      {{ t('btn.delete') }} ({{ selectedTemplateIdsForBatch.size }})
                   </button>
                   <div class="flex gap-1">
                       <input
@@ -360,14 +366,14 @@ function batchChangeGroup(groupName: string) {
                           <div class="flex items-center gap-2 mt-2 text-sm text-gray-500">
                               <span>Group:</span>
                               <div v-if="!editingGroupName" @click="editingGroupName = true" class="cursor-pointer hover:text-indigo-600 flex items-center gap-1">
-                                  {{ selectedTemplate.group || 'General' }}
+                                  {{ selectedTemplate.group || t('common.general') }}
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
                                     <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
                                   </svg>
                               </div>
                               <input 
                                 v-else
-                                :value="selectedTemplate.group || 'General'"
+                                :value="selectedTemplate.group || t('common.general')"
                                 @blur="(e) => updateTemplateGroup((e.target as HTMLInputElement).value)"
                                 @keydown.enter="(e) => updateTemplateGroup((e.target as HTMLInputElement).value)"
                                 class="border rounded px-1 py-0.5 text-sm"
@@ -376,7 +382,7 @@ function batchChangeGroup(groupName: string) {
                           </div>
                           <!-- Statistics -->
                           <div v-if="showStats" class="mt-2 text-xs text-gray-500">
-                              Matches: <span class="font-medium text-gray-700">{{ store.getTemplateMatchCount(selectedTemplate.id) }}</span> notes
+                              {{ t('templateManager.matches') }}: <span class="font-medium text-gray-700">{{ store.getTemplateMatchCount(selectedTemplate.id) }}</span> {{ t('status.notes') }}
                           </div>
                       </div>
                   </div>
@@ -388,8 +394,8 @@ function batchChangeGroup(groupName: string) {
                   <!-- Left: Available Tags -->
                   <div class="flex-1 flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                       <div class="p-3 border-b border-gray-200 bg-gray-50 font-medium text-gray-700 flex justify-between items-center">
-                          <span>Available Tags</span>
-                          <span class="text-xs text-gray-500">Click to Add</span>
+                          <span>{{ t('templateManager.availableTags') }}</span>
+                          <span class="text-xs text-gray-500">{{ t('templateManager.clickToAdd') }}</span>
                       </div>
                       <div class="flex-1 overflow-y-auto p-4 space-y-6">
                           
@@ -438,12 +444,12 @@ function batchChangeGroup(groupName: string) {
                   <!-- Right: Selected Tags -->
                   <div class="flex-1 flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                        <div class="p-3 border-b border-gray-200 bg-indigo-50 font-medium text-indigo-900 flex justify-between items-center">
-                          <span>Selected Tags</span>
-                          <span class="text-xs text-indigo-600">Click to Remove</span>
+                          <span>{{ t('templateManager.selectedTags') }}</span>
+                          <span class="text-xs text-indigo-600">{{ t('templateManager.clickToRemove') }}</span>
                       </div>
                       <div class="flex-1 overflow-y-auto p-4">
                           <div v-if="selectedTemplate.filterRules.includeTags.length === 0" class="text-center text-gray-400 mt-10">
-                              No tags selected.
+                              {{ t('templateManager.noTagsSelected') }}.
                           </div>
                           <div class="flex flex-wrap gap-2">
                               <button 
@@ -467,7 +473,7 @@ function batchChangeGroup(groupName: string) {
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-16 h-16 mb-4 opacity-20">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
               </svg>
-              <p>Select a template to edit or create a new one.</p>
+              <p>{{ t('templateManager.selectTemplateToEdit') }}</p>
           </div>
       </div>
 

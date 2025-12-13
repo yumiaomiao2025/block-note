@@ -2,9 +2,11 @@
 import { ref, computed } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
 import { useUIStore } from '../stores/uiStore';
+import { useI18n } from '../composables/useI18n';
 
 const store = useNoteStore();
 const uiStore = useUIStore(); // Although unused in logic, potentially needed for global UI interactions later or template styles
+const { t } = useI18n();
 
 const isCollapsed = ref(false);
 const isEditingGroups = ref(false);
@@ -47,7 +49,11 @@ function handleCreateGroup() {
 }
 
 function deleteGroup(id: string) {
-  if (confirm('Are you sure you want to delete this group? Tags will become uncategorized.')) {
+  const group = store.tagGroups.find(g => g.id === id);
+  const message = group 
+    ? t('tagManager.deleteTagGroupWarning')
+    : t('tagManager.deleteTagGroupNoTags');
+  if (confirm(message)) {
     store.deleteTagGroup(id);
   }
 }
@@ -83,7 +89,7 @@ function handleCreateTemplate() {
 }
 
 function deleteTemplate(id: string) {
-  if (confirm('Delete this template?')) {
+  if (confirm(t('templateManager.deleteTemplate'))) {
     store.deleteTemplate(id);
   }
 }
@@ -168,7 +174,7 @@ function confirmAddTag() {
   >
     <!-- Header / Collapse Toggle -->
     <div class="p-4 border-b border-gray-200 flex items-center justify-between">
-      <span v-if="!isCollapsed" class="font-bold text-gray-700">Explorer</span>
+      <span v-if="!isCollapsed" class="font-bold text-gray-700">{{ t('sidebar.explorer') }}</span>
       <button @click="toggleSidebar" class="text-gray-500 hover:text-indigo-600">
         <svg v-if="!isCollapsed" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
           <path fill-rule="evenodd" d="M15.79 14.77a.75.75 0 01-1.06.02l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 111.04 1.08L11.832 10l3.938 3.71a.75.75 0 01.02 1.06zm-6 0a.75.75 0 01-1.06.02l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 111.04 1.08L5.832 10l3.938 3.71a.75.75 0 01.02 1.06z" clip-rule="evenodd" />
@@ -184,7 +190,7 @@ function confirmAddTag() {
       <!-- Templates Section -->
       <div>
         <div class="flex items-center justify-between mb-2">
-          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Templates</h3>
+          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ t('sidebar.templates') }}</h3>
           <button @click="isCreatingTemplate = !isCreatingTemplate" class="text-gray-400 hover:text-indigo-600">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
               <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
@@ -197,7 +203,7 @@ function confirmAddTag() {
           <input 
             v-model="newTemplateName" 
             @keydown.enter="handleCreateTemplate"
-            placeholder="New Template" 
+            :placeholder="t('placeholder.newTemplate')" 
             class="w-full text-sm border rounded px-2 py-1"
           />
         </div>
@@ -208,7 +214,7 @@ function confirmAddTag() {
             class="w-full text-left px-2 py-1.5 rounded text-sm flex items-center justify-between group"
             :class="[!store.currentTemplateId ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-100']"
           >
-            <span>All Notes</span>
+            <span>{{ t('sidebar.allNotes') }}</span>
           </button>
 
           <div 
@@ -229,7 +235,7 @@ function confirmAddTag() {
       <!-- Tag Groups Section -->
       <div>
         <div class="flex items-center justify-between mb-2">
-          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tags</h3>
+          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ t('sidebar.tags') }}</h3>
           <div class="flex gap-2">
              <!-- Edit Template Tags (Toggle) -->
              <button 
@@ -259,7 +265,7 @@ function confirmAddTag() {
 
              <!-- Edit Groups Toggle -->
             <button @click="isEditingGroups = !isEditingGroups" class="text-xs text-gray-400 hover:text-indigo-600" :class="{ 'text-indigo-600': isEditingGroups }">
-              {{ isEditingGroups ? 'Done' : 'Edit' }}
+              {{ isEditingGroups ? t('btn.done') : t('btn.edit') }}
             </button>
           </div>
         </div>
@@ -269,7 +275,7 @@ function confirmAddTag() {
            <input 
             v-model="newGroupName" 
             @keydown.enter="handleCreateGroup"
-            placeholder="New Group" 
+            :placeholder="t('placeholder.newGroup')" 
             class="w-full text-sm border rounded px-2 py-1"
           />
           <button @click="handleCreateGroup" class="text-indigo-600 px-2 text-sm">+</button>
@@ -342,7 +348,7 @@ function confirmAddTag() {
                 <!-- Add Tag Button -->
                 <div class="mt-1">
                     <button v-if="addingTagToGroup !== group.id" @click="startAddTag(group.id)" class="text-[10px] text-gray-400 hover:text-indigo-600 flex items-center gap-1">
-                        <span>+ Add Tag</span>
+                        <span>+ {{ t('tagManager.addTag') }}</span>
                     </button>
                     <div v-else class="flex items-center gap-1">
                         <input 
@@ -351,7 +357,7 @@ function confirmAddTag() {
                             @blur="confirmAddTag"
                             class="text-xs border rounded px-1 py-0.5 w-20"
                             autoFocus
-                            placeholder="Tag name..."
+                            :placeholder="t('placeholder.tagName')"
                         />
                     </div>
                 </div>
@@ -360,7 +366,7 @@ function confirmAddTag() {
 
           <!-- Uncategorized -->
           <div v-if="hasUncategorizedTags">
-            <div class="text-sm font-medium text-gray-400 mb-1">Uncategorized</div>
+            <div class="text-sm font-medium text-gray-400 mb-1">{{ t('common.uncategorized') }}</div>
             <div class="flex flex-wrap gap-1.5 pl-1">
               <div 
                  v-for="tag in store.uncategorizedTags"
@@ -405,7 +411,7 @@ function confirmAddTag() {
     
     <!-- Footer / Settings (Collapsed view icons) -->
     <div v-if="isCollapsed" class="flex flex-col items-center py-4 gap-4">
-       <button @click="store.clearFilter" class="p-2 rounded-md hover:bg-gray-100 text-gray-500" title="All Notes">
+       <button @click="store.clearFilter" class="p-2 rounded-md hover:bg-gray-100 text-gray-500" :title="t('sidebar.allNotes')">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
             <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z" clip-rule="evenodd" />
           </svg>

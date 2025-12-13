@@ -9,15 +9,18 @@ import HoverPreviewPopover from '../components/HoverPreviewPopover.vue';
 import { useUIStore } from '../stores/uiStore';
 import { useNoteStore } from '../stores/noteStore';
 import type { FilterTemplate } from '../types/models';
+import { useI18n } from '../composables/useI18n';
 
 const uiStore = useUIStore();
 const store = useNoteStore();
+const { t } = useI18n();
 
 // --- Left Sidebar Logic (Templates) ---
 const groupedTemplates = computed(() => {
-    const groups: Record<string, typeof store.templates> = { 'General': [] };
+    const generalKey = t('common.general');
+    const groups: Record<string, typeof store.templates> = { [generalKey]: [] };
     store.templates.forEach(t => {
-        const g = t.group || 'General';
+        const g = t.group || generalKey;
         if (!groups[g]) groups[g] = [];
         groups[g].push(t);
     });
@@ -26,9 +29,10 @@ const groupedTemplates = computed(() => {
 
 const groupNames = computed(() => {
     const keys = Object.keys(groupedTemplates.value);
+    const generalKey = t('common.general');
     return keys.sort((a, b) => {
-        if (a === 'General') return -1;
-        if (b === 'General') return 1;
+        if (a === generalKey) return -1;
+        if (b === generalKey) return 1;
         return a.localeCompare(b);
     });
 });
@@ -148,14 +152,14 @@ function handleTagSelectorConfirm(tags: string[]) {
 }
 
 function renameLightTag(oldTag: string) {
-    const newTag = prompt('Rename tag:', oldTag);
+    const newTag = prompt(`${t('tagManager.renameTag')}:`, oldTag);
     if (newTag && newTag.trim() !== oldTag) {
         store.renameTagGlobal(oldTag, newTag.trim());
     }
 }
 
 function deleteLightTag(tag: string) {
-    if (confirm(`Delete tag "${tag}" globally?`)) {
+    if (confirm(t('dialog.deleteTag.title') + ` "${tag}"?`)) {
         store.deleteLightTagGlobal(tag);
         // Remove from filter if present
         if (store.secondaryFilterTags.includes(tag)) {
@@ -195,13 +199,13 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
     <div class="w-56 flex-shrink-0 border-r border-gray-200 bg-white/80 backdrop-blur flex flex-col h-full">
         <div class="p-4 border-b border-gray-100">
              <div class="flex justify-between items-center mb-2">
-                 <h2 class="font-bold text-gray-800 text-lg tracking-tight">Templates</h2>
+                 <h2 class="font-bold text-gray-800 text-lg tracking-tight">{{ t('sidebar.templates') }}</h2>
                  <div class="flex gap-1">
                      <button 
                        @click="store.isTemplateEnabled = !store.isTemplateEnabled"
                        class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
                        :class="store.isTemplateEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                       title="Enable/Disable Templates Filter"
+                       :title="t('tooltip.enableDisableTemplatesFilter')"
                      >
                        T
                      </button>
@@ -209,7 +213,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                        @click="uiStore.showNormalTags = !uiStore.showNormalTags"
                        class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
                        :class="uiStore.showNormalTags ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                       title="Show/Hide Tags on Cards"
+                       :title="t('tooltip.showHideTagsOnCards')"
                      >
                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
                           <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
@@ -228,9 +232,9 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                          :class="store.tagFilterMode === 'and' 
                              ? 'bg-white text-indigo-700 shadow-sm' 
                              : 'text-gray-600 hover:text-gray-900'"
-                         title="AND: Notes must contain all selected tags"
+                         :title="t('tooltip.andMode')"
                      >
-                         AND
+                         {{ t('common.and') }}
                      </button>
                      <button
                          @click="store.tagFilterMode = 'or'"
@@ -238,12 +242,12 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                          :class="store.tagFilterMode === 'or' 
                              ? 'bg-white text-indigo-700 shadow-sm' 
                              : 'text-gray-600 hover:text-gray-900'"
-                         title="OR: Notes must contain any selected tag"
+                         :title="t('tooltip.orMode')"
                      >
-                         OR
+                         {{ t('common.or') }}
                      </button>
                  </div>
-                 <span v-if="store.selectedTemplateIds.length > 0" class="text-[10px] text-gray-400">{{ store.selectedTemplateIds.length }} selected</span>
+                 <span v-if="store.selectedTemplateIds.length > 0" class="text-[10px] text-gray-400">{{ store.selectedTemplateIds.length }} {{ t('status.selected') }}</span>
              </div>
         </div>
         <div class="flex-1 overflow-y-auto p-2 space-y-4 custom-scrollbar" :class="{ 'opacity-50 pointer-events-none': !store.isTemplateEnabled }">
@@ -258,7 +262,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 transition-transform" :class="{ 'rotate-90': isStagingAreaExpanded }">
                                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                              </svg>
-                             <span class="text-gray-700">Tag Staging Area</span>
+                             <span class="text-gray-700">{{ t('sidebar.tagStagingArea') }}</span>
                              <span v-if="store.normalTagStagingArea.length > 0" class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">{{ store.normalTagStagingArea.length }}</span>
                          </div>
                          <div class="flex items-center gap-1">
@@ -266,14 +270,14 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                                  @click.stop="store.isNormalTagFilterEnabled = !store.isNormalTagFilterEnabled"
                                  class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
                                  :class="store.isNormalTagFilterEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                                 title="Enable/Disable Normal Tag Filter"
+                                 :title="t('tooltip.enableDisableNormalTagFilter')"
                              >
                                  N
                              </button>
                              <button
                                  @click.stop="showTagSelectorModal = true"
                                  class="w-4 h-4 rounded border text-gray-400 border-gray-300 hover:bg-gray-100 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition-colors"
-                                 title="Add Tags to Staging Area"
+                                 :title="t('tooltip.addTagsToStagingArea')"
                              >
                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
                                      <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
@@ -305,7 +309,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                                  </button>
                              </div>
                              <div v-if="store.normalTagStagingArea.length === 0" class="text-xs text-gray-400 italic">
-                                 No tags in staging area. Click the + icon to add tags.
+                                 {{ t('tagManager.noTagsInStagingArea') }}
                              </div>
                          </div>
                      </div>
@@ -321,7 +325,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 opacity-70">
                   <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z" clip-rule="evenodd" />
                 </svg>
-                All Notes
+                {{ t('sidebar.allNotes') }}
              </div>
 
              <!-- Groups -->
@@ -362,14 +366,14 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
           <div v-if="store.selectedTemplateIds.length > 0 || store.normalTagStagingArea.length > 0 || store.secondaryFilterTags.length > 0" class="mb-6 space-y-2">
               <!-- Template Filter Indicator -->
               <div v-if="store.selectedTemplateIds.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
-                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Templates ({{ store.tagFilterMode.toUpperCase() }})</span>
+                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">{{ t('common.templates') }} ({{ store.tagFilterMode === 'and' ? t('common.and') : t('common.or') }})</span>
                   <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
                       <span 
                         v-for="tplId in store.selectedTemplateIds" 
                         :key="tplId"
                         class="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium"
                       >
-                          {{ store.templates.find(t => t.id === tplId)?.name || 'Unknown' }}
+                          {{ store.templates.find(t => t.id === tplId)?.name || t('status.unknown') }}
                           <button @click="toggleTemplate(tplId)" class="hover:text-red-500 rounded-full hover:bg-indigo-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
                       </span>
                   </TransitionGroup>
@@ -377,7 +381,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
               
               <!-- Active Normal Tags Indicator -->
               <div v-if="store.activeNormalTags.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-purple-100 shadow-sm">
-                  <span class="text-xs font-bold text-purple-400 uppercase tracking-wide mr-2">Tags ({{ store.tagFilterMode.toUpperCase() }})</span>
+                  <span class="text-xs font-bold text-purple-400 uppercase tracking-wide mr-2">{{ t('common.normalTags') }} ({{ store.tagFilterMode === 'and' ? t('common.and') : t('common.or') }})</span>
                   <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
                       <span 
                         v-for="tag in store.activeNormalTags" 
@@ -388,12 +392,12 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                           <button @click="toggleNormalTagActive(tag)" class="hover:text-red-500 rounded-full hover:bg-purple-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
                       </span>
                   </TransitionGroup>
-                  <button @click="store.activeNormalTags = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">Clear All</button>
+                  <button @click="store.activeNormalTags = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">{{ t('btn.clearAll') }}</button>
               </div>
               
               <!-- Light Tag Filter Indicator -->
               <div v-if="store.secondaryFilterTags.length > 0" class="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-indigo-100 shadow-sm">
-                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">Light Tags ({{ store.lightTagFilterMode.toUpperCase() }})</span>
+                  <span class="text-xs font-bold text-indigo-400 uppercase tracking-wide mr-2">{{ t('common.lightTags') }} ({{ store.lightTagFilterMode === 'and' ? t('common.and') : t('common.or') }})</span>
                   <TransitionGroup name="list" tag="div" class="flex flex-wrap gap-2">
                       <span 
                         v-for="tag in store.secondaryFilterTags" 
@@ -404,7 +408,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                           <button @click="toggleSecondaryTag(tag)" class="hover:text-red-500 rounded-full hover:bg-indigo-200 w-4 h-4 flex items-center justify-center transition-colors">&times;</button>
                       </span>
                   </TransitionGroup>
-                  <button @click="store.secondaryFilterTags = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">Clear All</button>
+                  <button @click="store.secondaryFilterTags = []" class="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">{{ t('btn.clearAll') }}</button>
               </div>
           </div>
 
@@ -421,16 +425,16 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-indigo-500">
                           <path fill-rule="evenodd" d="M5.5 3A2.5 2.5 0 003 5.5v2.879a2.5 2.5 0 00.732 1.767l6.5 6.5a2.5 2.5 0 003.536 0l2.878-2.878a2.5 2.5 0 000-3.536l-6.5-6.5A2.5 2.5 0 008.38 3H5.5zM6 7a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
                         </svg>
-                        Quick Filter
+                        {{ t('sidebar.quickFilter') }}
                      </h2>
-                     <p class="text-[10px] text-gray-400 mt-1">Refine by light tags</p>
+                     <p class="text-[10px] text-gray-400 mt-1">{{ t('sidebar.refineByLightTags') }}</p>
                  </div>
                  <div class="flex gap-1">
                      <button 
                        @click="store.isLightFilterEnabled = !store.isLightFilterEnabled"
                        class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
                        :class="store.isLightFilterEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                       title="Enable/Disable Light Filter"
+                       :title="t('tooltip.enableDisableLightFilter')"
                      >
                        L
                      </button>
@@ -438,7 +442,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                        @click="uiStore.showLightTags = !uiStore.showLightTags"
                        class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
                        :class="uiStore.showLightTags ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                       title="Show/Hide Light Tags on Cards"
+                       :title="t('tooltip.showHideLightTagsOnCards')"
                      >
                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
                           <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
@@ -450,7 +454,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                        @click.stop="showLightTagSettings = !showLightTagSettings"
                        class="w-4 h-4 rounded border text-[10px] flex items-center justify-center transition-colors"
                        :class="showLightTagSettings ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300 hover:bg-gray-200'"
-                       title="轻标签显示设置"
+                       :title="t('tooltip.lightTagDisplaySettings')"
                      >
                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
                          <path fill-rule="evenodd" d="M8.5 2a1 1 0 000 2h.5a1 1 0 100-2h-.5zM5.22 3.22a.75.75 0 000 1.06l.5.5a.75.75 0 001.06-1.06l-.5-.5a.75.75 0 00-1.06 0zM13 2a1 1 0 100 2h.5a1 1 0 100-2H13zM3.28 6.22a.75.75 0 00-1.06 1.06l.5.5a.75.75 0 101.06-1.06l-.5-.5zM17 8a1 1 0 01-1 1h-.5a1 1 0 110-2H16a1 1 0 011 1zM9 10.5a1 1 0 01.5.866v4.134a.75.75 0 001.5 0v-4.134A1 1 0 0111 10.5a1 1 0 01-2 0zM4.5 13a1 1 0 100-2h-.5a1 1 0 100 2h.5zM17.72 13.78a.75.75 0 10-1.06-1.06l-.5.5a.75.75 0 101.06 1.06l.5-.5zM10 18a1 1 0 100-2h.5a1 1 0 100 2H10zM3.22 16.78a.75.75 0 001.06-1.06l-.5-.5a.75.75 0 10-1.06 1.06l.5.5zM14.5 18a1 1 0 100-2h.5a1 1 0 100 2h-.5z" clip-rule="evenodd" />
@@ -469,9 +473,9 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                          :class="store.lightTagFilterMode === 'and' 
                              ? 'bg-white text-indigo-700 shadow-sm' 
                              : 'text-gray-600 hover:text-gray-900'"
-                         title="AND: Notes must contain all selected light tags"
+                         :title="t('tooltip.andModeLight')"
                      >
-                         AND
+                         {{ t('common.and') }}
                      </button>
                      <button
                          @click="store.lightTagFilterMode = 'or'"
@@ -479,16 +483,16 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                          :class="store.lightTagFilterMode === 'or' 
                              ? 'bg-white text-indigo-700 shadow-sm' 
                              : 'text-gray-600 hover:text-gray-900'"
-                         title="OR: Notes must contain any selected light tag"
+                         :title="t('tooltip.orModeLight')"
                      >
-                         OR
+                         {{ t('common.or') }}
                      </button>
                  </div>
              </div>
              
              <!-- Sort Mode Control -->
              <div class="flex items-center justify-between gap-2">
-                 <span class="text-[10px] text-gray-500">排序</span>
+                 <span class="text-[10px] text-gray-500">{{ t('sort.sort') }}</span>
                  <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 shadow-sm">
                      <button
                          @click="lightTagSortMode = 'frequency'"
@@ -496,9 +500,9 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                          :class="lightTagSortMode === 'frequency' 
                              ? 'bg-white text-indigo-700 shadow-sm' 
                              : 'text-gray-600 hover:text-gray-900'"
-                         title="按使用频率排序"
+                         :title="t('sort.byFrequency')"
                      >
-                         频率
+                         {{ t('sort.frequency') }}
                      </button>
                      <button
                          @click="lightTagSortMode = 'alphabetical'"
@@ -506,9 +510,9 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                          :class="lightTagSortMode === 'alphabetical' 
                              ? 'bg-white text-indigo-700 shadow-sm' 
                              : 'text-gray-600 hover:text-gray-900'"
-                         title="按字母顺序排序"
+                         :title="t('sort.byAlphabetical')"
                      >
-                         字母
+                         {{ t('sort.alphabetical') }}
                      </button>
                  </div>
              </div>
@@ -519,7 +523,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                     class="text-[10px] px-2 py-0.5 rounded border transition-colors"
                     :class="isEditingLightTags ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-gray-400 border-gray-200 hover:text-indigo-600'"
                  >
-                    {{ isEditingLightTags ? 'Done Editing' : 'Edit Tags' }}
+                    {{ isEditingLightTags ? t('btn.doneEditing') : t('btn.editTags') }}
                  </button>
              </div>
         </div>
@@ -564,7 +568,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                         @keydown="handleNewLightTagKeydown"
                         @blur="addLightTagToSystem"
                         type="text" 
-                        placeholder="Add new light tag..."
+                        :placeholder="t('placeholder.addNewLightTag')"
                         class="text-xs px-2.5 py-1 rounded-md border-dashed border-gray-300 bg-white text-gray-600 cursor-default focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all inline-block"
                         style="min-width: 120px; width: auto;"
                     />
@@ -575,7 +579,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 opacity-30">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a22.53 22.53 0 003.744-3.744c.542-.826.369-1.908-.33-2.607L9.568 3z" />
                     </svg>
-                    <span>No tags available</span>
+                    <span>{{ t('status.noTagsAvailable') }}</span>
                 </div>
             </div>
         </div>

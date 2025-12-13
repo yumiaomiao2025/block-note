@@ -4,9 +4,11 @@ import { useNoteStore } from '../stores/noteStore';
 import { useUIStore } from '../stores/uiStore';
 import HoverPreviewPopover from '../components/HoverPreviewPopover.vue';
 import type { TagGroup } from '../types/models';
+import { useI18n } from '../composables/useI18n';
 
 const store = useNoteStore();
 const uiStore = useUIStore();
+const { t } = useI18n();
 
 const selectedGroupId = ref<string | 'uncategorized'>('uncategorized');
 const newGroupName = ref('');
@@ -146,14 +148,17 @@ function deleteGroup(id: string) {
     });
 
     const message = group.tags.length > 0
-        ? `确定要删除标签组"${group.name}"吗？\n\n该标签组包含 ${group.tags.length} 个标签，其中共有 ${totalUsage} 个笔记正在使用这些标签。\n\n删除后，组内所有标签将变为未分类状态，相关笔记中的标签将被保留。`
-        : `确定要删除标签组"${group.name}"吗？\n\n该标签组目前没有标签。`;
+        ? t('tagManager.deleteTagGroupConfirm', { name: group.name }) + '\n\n' + 
+          t('tagManager.deleteTagGroupWithTags', { count: group.tags.length, usage: totalUsage }) + '\n\n' +
+          t('tagManager.deleteTagGroupWarning')
+        : t('tagManager.deleteTagGroupConfirm', { name: group.name }) + '\n\n' + 
+          t('tagManager.deleteTagGroupNoTags');
 
     uiStore.showConfirm({
-        title: '删除标签组',
+        title: t('dialog.deleteTagGroup.title'),
         message: message,
-        confirmText: '删除',
-        cancelText: '取消',
+        confirmText: t('btn.delete'),
+        cancelText: t('btn.cancel'),
         onConfirm: () => {
             store.deleteTagGroup(id);
             if (selectedGroupId.value === id) {
@@ -180,13 +185,15 @@ function createTag() {
 
 function deleteTag(tag: string) {
     const usageCount = store.getTagUsageCount(tag);
-    const message = `确定要删除标签"${tag}"吗？\n\n共有 ${usageCount} 个笔记正在使用此标签。\n\n删除后，将从所有笔记和标签组中移除该标签。如需查看使用此标签的笔记，请前往首页查看。`;
+    const message = t('tagManager.deleteTagConfirm', { tag }) + '\n\n' + 
+                    t('tagManager.deleteTagUsage', { count: usageCount }) + '\n\n' +
+                    t('tagManager.deleteTagWarning');
 
     uiStore.showConfirm({
-        title: '删除标签',
+        title: t('dialog.deleteTag.title'),
         message: message,
-        confirmText: '删除',
-        cancelText: '取消',
+        confirmText: t('btn.delete'),
+        cancelText: t('btn.cancel'),
         onConfirm: () => {
             store.deleteTagGlobal(tag);
         }
@@ -211,10 +218,12 @@ function confirmRenameTag() {
     const usageCount = store.getTagUsageCount(oldTag);
     
     uiStore.showConfirm({
-        title: '确认重命名',
-        message: `确定要将标签"${oldTag}"重命名为"${newTag}"吗？\n\n共有 ${usageCount} 个笔记正在使用此标签，重命名后将同步更新所有笔记和标签组中的该标签。如需查看使用此标签的笔记，请前往首页查看。`,
-        confirmText: '确定',
-        cancelText: '取消',
+        title: t('dialog.renameTag.title'),
+        message: t('tagManager.renameTagConfirm', { oldTag, newTag }) + '\n\n' + 
+                  t('tagManager.renameTagUsage', { count: usageCount }) + '\n\n' +
+                  t('tagManager.renameTagWarning'),
+        confirmText: t('btn.confirm'),
+        cancelText: t('btn.cancel'),
         onConfirm: () => {
             store.renameTagGlobal(oldTag, newTag);
             showRenameTagDialog.value = false;
@@ -349,7 +358,7 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
               <div class="mt-2 flex gap-2">
                   <input 
                     v-model="newGroupName" 
-                    placeholder="New Group Name"
+                    :placeholder="t('placeholder.newGroup')"
                     class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
                     @keydown.enter="createGroup"
                   />
@@ -415,7 +424,7 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                          v-if="editingGroupId !== group.id"
                          @click.stop="startRenameGroup(group.id)" 
                          class="text-gray-400 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                         title="重命名"
+                         :title="t('btn.edit')"
                        >
                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
                              <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
@@ -439,7 +448,7 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                       <input
                         v-model="searchQuery"
                         type="text"
-                        placeholder="搜索标签组和标签..."
+                        :placeholder="t('placeholder.searchTags')"
                         class="w-full border rounded-md px-4 py-2 pl-10 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                       />
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -463,7 +472,7 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                                         class="text-xs px-2 py-0.5 rounded"
                                         :class="result.type === 'group' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'"
                                       >
-                                          {{ result.type === 'group' ? '标签组' : '标签' }}
+                                          {{ result.type === 'group' ? t('tagManager.tagGroup') : t('tagManager.tag') }}
                                       </span>
                                       <span class="font-medium text-gray-900 truncate">{{ result.name }}</span>
                                   </div>
@@ -488,12 +497,12 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                   <div class="flex items-center gap-2">
                        <input 
                          v-model="newTagInput" 
-                         placeholder="Add new tag..." 
+                         :placeholder="t('placeholder.tagName')" 
                          class="border rounded-md px-3 py-2 text-sm w-64 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                          @keydown.enter="createTag"
                        />
                        <button @click="createTag" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 shadow-sm transition-colors">
-                           Add Tag
+                           {{ t('tagManager.addTag') }}
                        </button>
                   </div>
               </div>
@@ -526,7 +535,7 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                       
                       <div class="mt-auto flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity pt-2 border-t border-gray-100">
                           <button @click="renameTag(tag)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 hover:bg-indigo-50 rounded">Rename</button>
-                          <button @click="deleteTag(tag)" class="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded">Delete</button>
+                          <button @click="deleteTag(tag)" class="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded">{{ t('btn.delete') }}</button>
                       </div>
                   </div>
               </div>
@@ -543,17 +552,17 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
             <!-- Modal -->
             <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 transform transition-all scale-100" @click.stop>
               <h3 class="text-lg font-semibold text-gray-900 mb-2">
-                重命名标签
+                {{ t('tagManager.renameTag') }}
               </h3>
               <div class="mb-4">
                 <p class="text-gray-600 text-sm mb-3">
-                  当前标签：<span class="font-medium text-gray-900">{{ renameTagOldName }}</span>
+                  {{ t('tagManager.currentTag') }}<span class="font-medium text-gray-900">{{ renameTagOldName }}</span>
                 </p>
                 <p class="text-gray-600 text-sm mb-4">
-                  共有 {{ store.getTagUsageCount(renameTagOldName) }} 个笔记正在使用此标签。重命名后，所有笔记和标签组中的该标签将被同步更新。如需查看使用此标签的笔记，请前往首页查看。
+                  {{ t('tagManager.usageCount', { count: store.getTagUsageCount(renameTagOldName) }) }}
                 </p>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                  新标签名称：
+                  {{ t('tagManager.newTagName') }}
                 </label>
                 <input
                   v-model="renameTagNewName"
@@ -570,7 +579,7 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                   @click="cancelRenameTag"
                   class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                 >
-                  取消
+                  {{ t('btn.cancel') }}
                 </button>
                 <button 
                   @click="confirmRenameTag"

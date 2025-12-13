@@ -6,8 +6,10 @@ import TemplateManagerView from './views/TemplateManagerView.vue';
 import { useUIStore } from './stores/uiStore';
 import DecorationLayer from './components/DecorationLayer.vue';
 import ConfirmDialog from './components/ConfirmDialog.vue';
+import { useI18n } from './composables/useI18n';
 
 const uiStore = useUIStore();
+const { t } = useI18n();
 
 const activeTab = ref('home');
 
@@ -51,21 +53,21 @@ const appStyles = computed(() => {
                 class="h-full border-b-2 px-3 text-sm font-medium transition-colors focus:outline-none"
                 :class="activeTab === 'home' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             >
-                Home
+                {{ t('nav.home') }}
             </button>
             <button 
                 @click="activeTab = 'tags'"
                 class="h-full border-b-2 px-3 text-sm font-medium transition-colors focus:outline-none"
                 :class="activeTab === 'tags' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             >
-                Tags (Manager)
+                {{ t('nav.tags') }}
             </button>
             <button 
                 @click="activeTab = 'templates'"
                 class="h-full border-b-2 px-3 text-sm font-medium transition-colors focus:outline-none"
                 :class="activeTab === 'templates' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
             >
-                Templates (Manager)
+                {{ t('nav.templates') }}
             </button>
         </div>
 
@@ -74,20 +76,27 @@ const appStyles = computed(() => {
                 @click="uiStore.quickPreviewMode = !uiStore.quickPreviewMode"
                 class="text-xs font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow focus:outline-none flex items-center gap-1.5"
                 :class="uiStore.quickPreviewMode ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
-                title="超级预览"
+                :title="t('tooltip.superPreview')"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
                     <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
                     <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 8.201 2.665 9.336 6.404.18.596.18 1.23 0 1.826C18.201 15.015 14.257 17.68 10 17.68c-4.257 0-8.201-2.665-9.336-6.404.18-.596.18-1.23 0 1.826zM10 14.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z" clip-rule="evenodd" />
                 </svg>
-                快捷预览
+                {{ t('nav.quickPreview') }}
             </button>
             <button 
                 @click="uiStore.toggleEditMode"
                 class="text-xs font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow focus:outline-none"
                 :class="uiStore.isEditing ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-500 hover:bg-gray-50'"
               >
-                {{ uiStore.isEditing ? 'Done' : 'Customize UI' }}
+                {{ uiStore.isEditing ? t('nav.done') : t('nav.customizeUI') }}
+              </button>
+            <button 
+                @click="uiStore.setLanguage(uiStore.language === 'zh' ? 'en' : 'zh')"
+                class="text-xs font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow focus:outline-none bg-white text-gray-500 hover:bg-gray-50"
+                :title="uiStore.language === 'zh' ? 'Switch to English' : '切换到中文'"
+              >
+                {{ uiStore.language === 'zh' ? 'EN' : '中文' }}
               </button>
         </div>
     </nav>

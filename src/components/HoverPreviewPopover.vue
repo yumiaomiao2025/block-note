@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { Teleport } from 'vue';
 import type { FilterTemplate, TagGroup } from '../types/models';
+import { useI18n } from '../composables/useI18n';
 
 const props = withDefaults(defineProps<{
   type: 'template' | 'tagGroup';
@@ -29,9 +30,11 @@ const tags = computed(() => {
   }
 });
 
+const { t } = useI18n();
+
 // 标题文本
 const title = computed(() => {
-  return props.type === 'template' ? '模板标签' : '标签组标签';
+  return props.type === 'template' ? t('hoverPreview.templateTags') : t('hoverPreview.tagGroupTags');
 });
 
 // 处理鼠标移动（跟随模式）
@@ -199,7 +202,7 @@ defineExpose({
         >
           {{ tag }}
         </span>
-        <span v-if="tags.length === 0" class="italic opacity-50 text-[10px]">无标签</span>
+        <span v-if="tags.length === 0" class="italic opacity-50 text-[10px]">{{ t('hoverPreview.noTags') }}</span>
       </div>
     </div>
   </Teleport>

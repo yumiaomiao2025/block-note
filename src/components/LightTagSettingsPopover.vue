@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { Teleport } from 'vue';
 import { useUIStore } from '../stores/uiStore';
+import { useI18n } from '../composables/useI18n';
 
 const props = defineProps<{
   triggerElement?: HTMLElement | null;
@@ -10,6 +11,7 @@ const props = defineProps<{
 const emit = defineEmits(['close']);
 
 const uiStore = useUIStore();
+const { t } = useI18n();
 const displayLimit = ref(uiStore.lightTagDisplayLimit);
 
 // 浮窗位置
@@ -93,14 +95,14 @@ onUnmounted(() => {
     >
       <!-- Header -->
       <div class="p-3 border-b border-gray-100 bg-gray-50">
-        <h3 class="font-semibold text-gray-800 text-sm">轻标签显示设置</h3>
+        <h3 class="font-semibold text-gray-800 text-sm">{{ t('lightTagSettings.title') }}</h3>
       </div>
       
       <!-- Content -->
       <div class="p-4 space-y-3">
         <div>
           <label class="block text-xs text-gray-600 mb-2">
-            "+N" 大于几个时显示
+            {{ t('lightTagSettings.plusNThreshold') }}
           </label>
           <input 
             v-model.number="displayLimit"
@@ -112,7 +114,7 @@ onUnmounted(() => {
         </div>
         
         <p class="text-xs text-gray-500">
-          如果设置很大，轻标签将全部显示，不会出现 "+N"。
+          {{ t('lightTagSettings.description') }}
         </p>
       </div>
       
@@ -122,13 +124,13 @@ onUnmounted(() => {
           @click="emit('close')"
           class="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
         >
-          取消
+          {{ t('btn.cancel') }}
         </button>
         <button 
           @click="handleSave"
           class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
         >
-          保存
+          {{ t('btn.save') }}
         </button>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { useTextareaAutosize } from '@vueuse/core';
 import type { NoteBlock } from '../types/models';
 import { useNoteStore } from '../stores/noteStore';
 import { useUIStore } from '../stores/uiStore';
+import { useI18n } from '../composables/useI18n';
 import { toPng } from 'html-to-image';
 import TagSelectorPopover from './TagSelectorPopover.vue'; // Import new component
 
@@ -13,6 +14,7 @@ const props = defineProps<{
 
 const store = useNoteStore();
 const uiStore = useUIStore();
+const { t } = useI18n();
 const { textarea, input } = useTextareaAutosize({ input: props.note.content });
 const newTagInput = ref('');
 const newLightTagInput = ref(''); 
@@ -86,10 +88,10 @@ function toggleZenMode() {
 
 function handleDeleteNote() {
   uiStore.showConfirm({
-    title: '删除笔记',
-    message: '确认删除该笔记吗？此操作无法撤销。',
-    confirmText: '删除',
-    cancelText: '取消',
+    title: t('dialog.deleteNote.title'),
+    message: t('dialog.deleteNote.message'),
+    confirmText: t('btn.delete'),
+    cancelText: t('btn.cancel'),
     onConfirm: () => store.deleteNote(props.note.id)
   });
 }
@@ -407,7 +409,7 @@ const shouldShowMoreIndicator = computed(() => {
         class="fixed z-[9999] bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl backdrop-blur pointer-events-auto transition-opacity duration-200 max-w-xs"
         :style="moreTagsTooltipStyle"
       >
-        <div class="font-bold mb-2 border-b border-white/10 pb-1 text-gray-300">剩余标签</div>
+        <div class="font-bold mb-2 border-b border-white/10 pb-1 text-gray-300">{{ t('noteBlock.remainingTags') }}</div>
         <div class="flex flex-wrap gap-1.5">
           <span 
             v-for="tag in remainingLightTags" 
