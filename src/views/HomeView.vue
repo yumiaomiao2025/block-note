@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useStorage } from '@vueuse/core';
 import BlockList from '../components/BlockList.vue';
 import UIConfigPanel from '../components/UIConfigPanel.vue';
 import LightTagSettingsPopover from '../components/LightTagSettingsPopover.vue';
 import TagSelectorModal from '../components/TagSelectorModal.vue';
+import HoverPreviewPopover from '../components/HoverPreviewPopover.vue';
 import { useUIStore } from '../stores/uiStore';
 import { useNoteStore } from '../stores/noteStore';
+import type { FilterTemplate } from '../types/models';
 
 const uiStore = useUIStore();
 const store = useNoteStore();
@@ -42,36 +44,20 @@ function clearTemplate() {
     store.secondaryFilterTags = [];
 }
 
-// Hover Tooltip Logic
-const hoveredTemplateId = ref<string | null>(null);
-const showTooltip = ref(false);
-let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+// Hover Preview Logic (for Quick Preview Mode)
+const hoveredTemplate = ref<FilterTemplate | null>(null);
 
-function onTemplateMouseEnter(id: string) {
-    if (hoverTimer) clearTimeout(hoverTimer);
-    hoveredTemplateId.value = id;
-    hoverTimer = setTimeout(() => {
-        if (hoveredTemplateId.value === id) {
-            showTooltip.value = true;
-        }
-    }, 2000); // 2 seconds delay
+function onTemplateMouseEnter(template: FilterTemplate) {
+    if (uiStore.quickPreviewMode) {
+        hoveredTemplate.value = template;
+    }
 }
 
 function onTemplateMouseLeave() {
-    if (hoverTimer) clearTimeout(hoverTimer);
-    hoveredTemplateId.value = null;
-    showTooltip.value = false;
+    if (uiStore.quickPreviewMode) {
+        hoveredTemplate.value = null;
+    }
 }
-
-const hoveredTemplateTags = computed(() => {
-    if (!hoveredTemplateId.value) return [];
-    const tpl = store.templates.find(t => t.id === hoveredTemplateId.value);
-    return tpl ? tpl.filterRules.includeTags : [];
-});
-
-onUnmounted(() => {
-    if (hoverTimer) clearTimeout(hoverTimer);
-});
 
 
 // --- Right Sidebar Logic (Light Tags) ---
@@ -346,7 +332,7 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                         v-for="tpl in groupedTemplates[group]" 
                         :key="tpl.id"
                         @click="toggleTemplate(tpl.id)"
-                        @mouseenter="onTemplateMouseEnter(tpl.id)"
+                        @mouseenter="onTemplateMouseEnter(tpl)"
                         @mouseleave="onTemplateMouseLeave"
                         class="px-3 py-2 rounded-lg cursor-pointer relative group/item transition-all duration-200 text-sm font-medium flex items-center gap-2"
                         :class="store.selectedTemplateIds.includes(tpl.id) ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'hover:bg-gray-50 text-gray-600'"
@@ -359,26 +345,6 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
                               </svg>
                           </div>
                           <span class="truncate block flex-1">{{ tpl.name }}</span>
-                          
-                          <!-- Hover Tooltip -->
-                          <Teleport to="body">
-                              <div 
-                                v-if="showTooltip && hoveredTemplateId === tpl.id"
-                                class="fixed z-[9999] bg-gray-900 text-white text-xs rounded p-3 w-48 shadow-xl backdrop-blur pointer-events-none transition-opacity duration-200"
-                                :style="{ 
-                                    left: '14rem', // Approx width of sidebar
-                                    top: '50%', // Centered vertically roughly or tracking mouse would be better but hard without event
-                                    transform: 'translateY(-50%)'
-                                }" 
-                                ref="tooltipRef"
-                              >
-                                  <div class="font-bold mb-2 border-b border-white/10 pb-1 text-gray-300">Included Tags</div>
-                                  <div class="flex flex-wrap gap-1.5">
-                                      <span v-for="tag in hoveredTemplateTags" :key="tag" class="bg-white/10 px-1.5 py-0.5 rounded text-[10px]">{{ tag }}</span>
-                                      <span v-if="hoveredTemplateTags.length === 0" class="italic opacity-50">No specific tags</span>
-                                  </div>
-                              </div>
-                          </Teleport>
                       </div>
                   </div>
               </div>
@@ -622,12 +588,29 @@ function handleNewLightTagKeydown(event: KeyboardEvent) {
         />
     </div>
 
+    <!-- Hover Preview Popover -->
+    <HoverPreviewPopover
+        v-if="uiStore.quickPreviewMode && hoveredTemplate"
+        ref="hoverPreviewRef"
+        type="template"
+        :data="hoveredTemplate"
+        position="follow"
+    />
+
     <!-- Tag Selector Modal -->
     <TagSelectorModal
         :isOpen="showTagSelectorModal"
         :selectedTags="store.normalTagStagingArea"
         @close="showTagSelectorModal = false"
         @confirm="handleTagSelectorConfirm"
+    />
+
+    <!-- Hover Preview Popover -->
+    <HoverPreviewPopover
+        v-if="uiStore.quickPreviewMode && hoveredTemplate"
+        type="template"
+        :data="hoveredTemplate"
+        position="follow"
     />
 
   </div>

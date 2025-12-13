@@ -69,12 +69,12 @@ const appStyles = computed(() => {
             </button>
         </div>
 
-        <div v-if="activeTab === 'home'" class="flex items-center gap-2">
+        <div class="flex items-center gap-2">
             <button 
                 @click="uiStore.quickPreviewMode = !uiStore.quickPreviewMode"
                 class="text-xs font-medium px-3 py-1.5 rounded-full transition-all shadow-sm hover:shadow focus:outline-none flex items-center gap-1.5"
                 :class="uiStore.quickPreviewMode ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
-                title="快捷预览"
+                title="超级预览"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
                     <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />

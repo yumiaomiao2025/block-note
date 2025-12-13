@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
+import { useUIStore } from '../stores/uiStore';
+import HoverPreviewPopover from '../components/HoverPreviewPopover.vue';
 import { v4 as uuidv4 } from 'uuid';
+import type { FilterTemplate } from '../types/models';
 
 const store = useNoteStore();
+const uiStore = useUIStore();
 
 const selectedTemplateId = ref<string | null>(null);
 const newTemplateName = ref('');
@@ -14,6 +18,9 @@ const isBatchMode = ref(false);
 const selectedTemplateIdsForBatch = ref<Set<string>>(new Set());
 const showStats = ref(false);
 const batchGroupName = ref('');
+
+// Hover Preview Logic (for Quick Preview Mode)
+const hoveredTemplate = ref<FilterTemplate | null>(null);
 
 // --- Computed ---
 const groupedTemplates = computed(() => {
@@ -299,6 +306,8 @@ function batchChangeGroup(groupName: string) {
                         v-for="tpl in groupedFilteredTemplates[group]" 
                         :key="tpl.id"
                         @click="isBatchMode ? toggleBatchSelection(tpl.id) : (selectedTemplateId = tpl.id)"
+                        @mouseenter="uiStore.quickPreviewMode && (hoveredTemplate = tpl)"
+                        @mouseleave="uiStore.quickPreviewMode && (hoveredTemplate = null)"
                         class="px-3 py-2 rounded cursor-pointer flex justify-between items-center group transition-colors"
                         :class="[
                             isBatchMode && selectedTemplateIdsForBatch.has(tpl.id) ? 'bg-indigo-100 text-indigo-700' : '',
@@ -461,5 +470,13 @@ function batchChangeGroup(groupName: string) {
               <p>Select a template to edit or create a new one.</p>
           </div>
       </div>
+
+      <!-- Hover Preview Popover -->
+      <HoverPreviewPopover
+          v-if="uiStore.quickPreviewMode && hoveredTemplate"
+          type="template"
+          :data="hoveredTemplate"
+          position="follow"
+      />
   </div>
 </template>

@@ -2,6 +2,8 @@
 import { ref, computed, nextTick, Teleport } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
 import { useUIStore } from '../stores/uiStore';
+import HoverPreviewPopover from '../components/HoverPreviewPopover.vue';
+import type { TagGroup } from '../types/models';
 
 const store = useNoteStore();
 const uiStore = useUIStore();
@@ -11,6 +13,9 @@ const newGroupName = ref('');
 const newTagInput = ref('');
 const searchQuery = ref('');
 const highlightedId = ref<string | null>(null);
+
+// Hover Preview Logic (for Quick Preview Mode)
+const hoveredTagGroup = ref<TagGroup | null>(null);
 
 // 标签组重命名相关
 const editingGroupId = ref<string | null>(null);
@@ -378,6 +383,8 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
                 :key="group.id"
                 :ref="el => { if (el) groupRefs[group.id] = el as HTMLElement }"
                 @click="selectedGroupId = group.id"
+                @mouseenter="uiStore.quickPreviewMode && (hoveredTagGroup = group)"
+                @mouseleave="uiStore.quickPreviewMode && (hoveredTagGroup = null)"
                 @dragover.prevent
                 @drop="onDropGroup($event, group.id)"
                 class="px-3 py-2 rounded cursor-pointer flex justify-between items-center group transition-colors"
@@ -576,6 +583,14 @@ function onDropGroup(event: DragEvent, targetGroupId: string) {
           </div>
         </Transition>
       </Teleport>
+
+      <!-- Hover Preview Popover -->
+      <HoverPreviewPopover
+          v-if="uiStore.quickPreviewMode && hoveredTagGroup"
+          type="tagGroup"
+          :data="hoveredTagGroup"
+          position="follow"
+      />
   </div>
 </template>
 
