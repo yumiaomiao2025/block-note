@@ -41,6 +41,12 @@ const selectedTemplate = computed(() => store.templates.find(t => t.id === selec
 // 获取通用组 ID
 const generalGroupId = computed(() => store.getGeneralGroupId());
 
+// 获取当前模板的组 ID（如果没有则使用通用组）
+const currentTemplateGroupId = computed(() => {
+    if (!selectedTemplate.value) return generalGroupId.value;
+    return selectedTemplate.value.groupId || generalGroupId.value;
+});
+
 // 获取模板组名称
 function getGroupName(groupId: string | undefined): string {
     if (!groupId) return t('common.general');
@@ -339,6 +345,15 @@ function cancelRenameTemplate() {
     editingTemplateName.value = '';
 }
 
+// 移动模板到组
+function moveTemplateToGroup(templateId: string, groupId: string) {
+    store.updateTemplate(templateId, { 
+        groupId,
+        // 清除旧的 group 字段（向后兼容）
+        group: undefined
+    });
+}
+
 </script>
 
 <template>
@@ -497,9 +512,22 @@ function cancelRenameTemplate() {
                   <div class="flex justify-between items-start mb-4">
                       <div>
                           <h1 class="text-2xl font-bold text-gray-900">{{ selectedTemplate.name }}</h1>
-                          <div class="flex items-center gap-2 mt-2 text-sm text-gray-500">
-                              <span>Group:</span>
-                              <span>{{ getGroupName(selectedTemplate.groupId) }}</span>
+                          <div class="flex items-center gap-2 mt-2">
+                              <span class="text-sm text-gray-500">{{ t('templateManager.changeGroup') }}:</span>
+                              <select 
+                                  :value="currentTemplateGroupId"
+                                  @change="moveTemplateToGroup(selectedTemplate.id, ($event.target as HTMLSelectElement).value)"
+                                  class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-gray-400 transition-colors cursor-pointer"
+                                  :title="t('templateManager.moveTemplateToGroup')"
+                              >
+                                  <option 
+                                      v-for="group in sortedTemplateGroups" 
+                                      :key="group.id"
+                                      :value="group.id"
+                                  >
+                                      {{ group.name }}
+                                  </option>
+                              </select>
                           </div>
                           <!-- Statistics -->
                           <div v-if="showStats" class="mt-2 text-xs text-gray-500">
