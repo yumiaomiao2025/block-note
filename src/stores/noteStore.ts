@@ -18,6 +18,10 @@ export const useNoteStore = defineStore('note', () => {
   const templateGroupSortOrder = useStorage<'manual' | 'name' | 'usage' | 'time'>('blocknote-template-group-sort', 'manual');
   const templateInGroupSortOrder = useStorage<'manual' | 'name' | 'usage' | 'time'>('blocknote-template-in-group-sort', 'manual');
   
+  // Tag group sorting states
+  const tagGroupSortOrder = useStorage<'manual' | 'alphabetical' | 'usage'>('blocknote-tag-group-sort', 'manual');
+  const tagInGroupSortOrder = useStorage<'manual' | 'alphabetical' | 'usage'>('blocknote-tag-in-group-sort', 'manual');
+  
   // Active filter state (not persisted automatically, resets on reload, or could be persisted)
   const activeFilter = useStorage<FilterRules>('blocknote-active-filter', {
     includeTags: []
@@ -68,6 +72,31 @@ export const useNoteStore = defineStore('note', () => {
       group.tags.forEach(tag => categorized.add(tag));
     });
     return allTags.value.filter(tag => !categorized.has(tag));
+  });
+
+  const sortedTagGroups = computed(() => {
+    const groups = [...tagGroups.value];
+    
+    if (tagGroupSortOrder.value === 'manual') {
+      // 自定义排序：按 order 字段升序，未设置 order 的排在最后
+      return groups.sort((a, b) => {
+        const aOrder = a.order ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = b.order ?? Number.MAX_SAFE_INTEGER;
+        return aOrder - bOrder;
+      });
+    } else if (tagGroupSortOrder.value === 'alphabetical') {
+      // 按字母排序
+      return groups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    } else if (tagGroupSortOrder.value === 'usage') {
+      // 按使用频率排序：计算组内所有标签的总使用频率
+      return groups.sort((a, b) => {
+        const aUsage = a.tags.reduce((sum, tag) => sum + getTagUsageCount(tag), 0);
+        const bUsage = b.tags.reduce((sum, tag) => sum + getTagUsageCount(tag), 0);
+        return bUsage - aUsage; // 降序
+      });
+    }
+    
+    return groups;
   });
 
   const filteredNotes = computed(() => {
@@ -316,10 +345,17 @@ export const useNoteStore = defineStore('note', () => {
 
   // Tag Group Actions
   function createTagGroup(name: string) {
+    // 计算新组的 order：当前最大 order + 1
+    const maxOrder = tagGroups.value.reduce((max, group) => {
+      const order = group.order ?? 0;
+      return order > max ? order : max;
+    }, 0);
+    
     const newGroup: TagGroup = {
       id: uuidv4(),
       name,
-      tags: []
+      tags: [],
+      order: maxOrder + 1
     };
     tagGroups.value.push(newGroup);
   }
@@ -370,6 +406,119 @@ export const useNoteStore = defineStore('note', () => {
   // Helper function to count tag usage in notes
   function getTagUsageCount(tag: string): number {
     return notes.value.filter(note => note.tags.includes(tag)).length;
+  }
+
+  // Tag Group Sorting Functions
+  function updateTagGroupOrder(groupId: string, newOrder: number) {
+    const group = tagGroups.value.find(g => g.id === groupId);
+    if (group) {
+      group.order = newOrder;
+    }
+  }
+
+  function reorderTagGroups(sourceIndex: number, targetIndex: number) {
+    if (sourceIndex === targetIndex) return;
+    
+    // 获取排序后的数组（在 manual 模式下就是按 order 排序）
+    const sorted = sortedTagGroups.value;
+    const sourceGroup = sorted[sourceIndex];
+    
+    if (!sourceGroup) return;
+    
+    // 找到源组在实际数组中的索引
+    const actualSourceIndex = tagGroups.value.findIndex(g => g.id === sourceGroup.id);
+    if (actualSourceIndex === -1) return;
+    
+    // 找到目标位置对应的组在实际数组中的索引
+    const targetGroup = sorted[targetIndex];
+    if (!targetGroup) return;
+    const actualTargetIndex = tagGroups.value.findIndex(g => g.id === targetGroup.id);
+    if (actualTargetIndex === -1) return;
+    
+    // 从原位置移除
+    const [movedGroup] = tagGroups.value.splice(actualSourceIndex, 1);
+    
+    // 计算新的插入位置（考虑移除后的索引变化）
+    let newIndex = actualTargetIndex;
+    if (actualSourceIndex < actualTargetIndex) {
+      newIndex = actualTargetIndex; // 源在目标前面，移除后目标索引减1，但我们插入到目标位置
+    } else {
+      newIndex = actualTargetIndex; // 源在目标后面，目标索引不变
+    }
+    
+    // 插入到新位置
+    tagGroups.value.splice(newIndex, 0, movedGroup);
+    
+    // 重新分配 order 值
+    tagGroups.value.forEach((group, index) => {
+      group.order = index + 1;
+    });
+  }
+
+  function getSortedTagsInGroup(groupId: string): string[] {
+    const group = tagGroups.value.find(g => g.id === groupId);
+    if (!group) return [];
+    
+    const tags = [...group.tags];
+    
+    if (tagInGroupSortOrder.value === 'manual') {
+      // 自定义排序：保持原始顺序
+      return tags;
+    } else if (tagInGroupSortOrder.value === 'alphabetical') {
+      // 按字母排序
+      return tags.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    } else if (tagInGroupSortOrder.value === 'usage') {
+      // 按使用频率排序
+      return tags.sort((a, b) => {
+        const aUsage = getTagUsageCount(a);
+        const bUsage = getTagUsageCount(b);
+        return bUsage - aUsage; // 降序
+      });
+    }
+    
+    return tags;
+  }
+
+  function reorderTagsInGroup(groupId: string, sourceIndex: number, targetIndex: number) {
+    const group = tagGroups.value.find(g => g.id === groupId);
+    if (!group) return;
+    
+    if (sourceIndex === targetIndex) return;
+    
+    // 获取排序后的标签数组
+    const sortedTags = getSortedTagsInGroup(groupId);
+    const tag = sortedTags[sourceIndex];
+    
+    if (!tag) return;
+    
+    // 从原数组中移除
+    const actualSourceIndex = group.tags.indexOf(tag);
+    if (actualSourceIndex === -1) return;
+    
+    group.tags.splice(actualSourceIndex, 1);
+    
+    // 计算目标位置在原数组中的索引
+    let actualTargetIndex = targetIndex;
+    if (targetIndex > sourceIndex) {
+      const targetTag = sortedTags[targetIndex];
+      if (targetTag) {
+        const idx = group.tags.indexOf(targetTag);
+        actualTargetIndex = idx !== -1 ? idx + 1 : group.tags.length;
+      } else {
+        actualTargetIndex = group.tags.length;
+      }
+    } else {
+      const targetTag = sortedTags[targetIndex];
+      if (targetTag) {
+        actualTargetIndex = group.tags.indexOf(targetTag);
+        if (actualTargetIndex === -1) actualTargetIndex = 0;
+      } else {
+        actualTargetIndex = 0;
+      }
+    }
+    
+    // 插入到新位置
+    group.tags.splice(actualTargetIndex, 0, tag);
   }
 
   // Filter & Template Actions
@@ -574,9 +723,12 @@ export const useNoteStore = defineStore('note', () => {
     lightTagFilterMode,
     templateGroupSortOrder,
     templateInGroupSortOrder,
+    tagGroupSortOrder,
+    tagInGroupSortOrder,
     currentTemplateId,
     allTags,
     uncategorizedTags,
+    sortedTagGroups,
     filteredNotes,
     addNote,
     deleteNote,
@@ -604,6 +756,10 @@ export const useNoteStore = defineStore('note', () => {
     switchTemplate,
     getTagUsageCount,
     getTemplateMatchCount,
+    updateTagGroupOrder,
+    reorderTagGroups,
+    getSortedTagsInGroup,
+    reorderTagsInGroup,
     getGeneralGroupId,
     createTemplateGroup,
     deleteTemplateGroup,

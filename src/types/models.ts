@@ -49,6 +49,7 @@ export interface TagGroup {
   id: string;
   name: string;
   tags: string[];
+  order?: number; // 用于自定义排序
 }
 
 export interface TemplateGroup {

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
 import { useUIStore } from '../stores/uiStore';
 import { useI18n } from '../composables/useI18n';
+import TagGroupSortSettingsPopover from './TagGroupSortSettingsPopover.vue';
 
 const store = useNoteStore();
 const uiStore = useUIStore(); // Although unused in logic, potentially needed for global UI interactions later or template styles
@@ -17,20 +18,28 @@ const newTemplateName = ref('');
 const isCreatingTemplate = ref(false);
 const collapsedGroups = ref<string[]>([]);
 
+// 排序设置悬浮窗
+const showSortSettingsPopover = ref(false);
+const sortSettingsTriggerElement = ref<HTMLElement | null>(null);
+const draggingGroupId = ref<string | null>(null);
+const draggingTagIndex = ref<number | null>(null);
+
 // --- Computed ---
 
 const currentTemplate = computed(() => store.templates.find(t => t.id === store.currentTemplateId));
 
 const visibleTagGroups = computed(() => {
+  let groups = store.sortedTagGroups;
+  
   if (isManagingTemplateGroups.value) {
-    return store.tagGroups;
+    return groups;
   }
   
   if (currentTemplate.value && currentTemplate.value.associatedTagGroups && currentTemplate.value.associatedTagGroups.length > 0) {
-    return store.tagGroups.filter(g => currentTemplate.value!.associatedTagGroups!.includes(g.id));
+    return groups.filter(g => currentTemplate.value!.associatedTagGroups!.includes(g.id));
   }
   
-  return store.tagGroups;
+  return groups;
 });
 
 const hasUncategorizedTags = computed(() => store.uncategorizedTags.length > 0);
@@ -146,21 +155,88 @@ function toggleGroupCollapse(groupId: string) {
   }
 }
 
+function openSortSettings(event: MouseEvent) {
+  event.stopPropagation();
+  sortSettingsTriggerElement.value = event.currentTarget as HTMLElement;
+  showSortSettingsPopover.value = true;
+}
+
+function closeSortSettings() {
+  showSortSettingsPopover.value = false;
+  sortSettingsTriggerElement.value = null;
+}
+
+// --- Group DnD ---
+function onGroupDragStart(event: DragEvent, groupId: string) {
+  if (event.dataTransfer && store.tagGroupSortOrder === 'manual') {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('group-id', groupId);
+    draggingGroupId.value = groupId;
+  }
+}
+
+function onGroupDragOver(event: DragEvent, groupId: string) {
+  if (store.tagGroupSortOrder === 'manual' && draggingGroupId.value && draggingGroupId.value !== groupId) {
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = 'move';
+  }
+}
+
+function onGroupDrop(event: DragEvent, targetGroupId: string) {
+  event.preventDefault();
+  if (store.tagGroupSortOrder !== 'manual') return;
+  
+  const sourceGroupId = event.dataTransfer?.getData('group-id');
+  if (!sourceGroupId || sourceGroupId === targetGroupId) {
+    draggingGroupId.value = null;
+    return;
+  }
+  
+  const sortedGroups = visibleTagGroups.value;
+  const sourceIndex = sortedGroups.findIndex(g => g.id === sourceGroupId);
+  const targetIndex = sortedGroups.findIndex(g => g.id === targetGroupId);
+  
+  if (sourceIndex !== -1 && targetIndex !== -1) {
+    store.reorderTagGroups(sourceIndex, targetIndex);
+  }
+  
+  draggingGroupId.value = null;
+}
+
 // --- Tag DnD ---
 
-function onDragStart(event: DragEvent, tag: string, sourceGroupId: string | null) {
+function onDragStart(event: DragEvent, tag: string, sourceGroupId: string | null, tagIndex?: number) {
     if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', tag);
         event.dataTransfer.setData('source-group', sourceGroupId || 'uncategorized');
+        if (tagIndex !== undefined) {
+          event.dataTransfer.setData('tag-index', tagIndex.toString());
+        }
+        draggingTagIndex.value = tagIndex ?? null;
     }
 }
 
 function onDrop(event: DragEvent, targetGroupId: string) {
     const tag = event.dataTransfer?.getData('text/plain');
     const sourceGroup = event.dataTransfer?.getData('source-group');
+    const sourceTagIndex = event.dataTransfer?.getData('tag-index');
     
     if (tag && sourceGroup) {
+        // 如果是组内拖拽排序（自定义排序模式）
+        if (sourceGroup === targetGroupId && sourceGroup !== 'uncategorized' && store.tagInGroupSortOrder === 'manual' && sourceTagIndex) {
+            const sourceIndex = parseInt(sourceTagIndex);
+            const sortedTags = store.getSortedTagsInGroup(targetGroupId);
+            const targetIndex = sortedTags.findIndex(t => t === tag);
+            
+            if (sourceIndex !== -1 && targetIndex !== -1 && sourceIndex !== targetIndex) {
+                store.reorderTagsInGroup(targetGroupId, sourceIndex, targetIndex);
+            }
+            draggingTagIndex.value = null;
+            return;
+        }
+        
+        // 原有的组间移动逻辑
         // Remove from source
         if (sourceGroup !== 'uncategorized') {
             store.removeTagFromGroup(sourceGroup, tag);
@@ -168,6 +244,7 @@ function onDrop(event: DragEvent, targetGroupId: string) {
         // Add to target
         store.addTagToGroup(targetGroupId, tag);
     }
+    draggingTagIndex.value = null;
 }
 
 // --- Add New Tag to Group ---
@@ -311,9 +388,15 @@ function confirmAddTag() {
             v-for="group in visibleTagGroups" 
             :key="group.id" 
             class="group"
-            @dragover.prevent
-            @drop="onDrop($event, group.id)"
           >
+            <!-- Group Header (draggable for group reordering) -->
+            <div
+              :draggable="store.tagGroupSortOrder === 'manual'"
+              @dragstart.stop="onGroupDragStart($event, group.id)"
+              @dragover.prevent.stop="onGroupDragOver($event, group.id)"
+              @drop.prevent.stop="onGroupDrop($event, group.id)"
+              :class="{ 'cursor-move': store.tagGroupSortOrder === 'manual' }"
+            >
             <div class="flex items-center justify-between mb-1">
               <div class="flex items-center gap-2">
                  <!-- Collapse Toggle -->
@@ -334,21 +417,39 @@ function confirmAddTag() {
                  <span class="text-sm font-medium text-gray-700">{{ group.name }}</span>
               </div>
               
-              <button v-if="isEditingGroups" @click="deleteGroup(group.id)" class="text-gray-300 hover:text-red-500">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-                   <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                </svg>
-              </button>
+              <div class="flex items-center gap-1">
+                <!-- Sort Settings Button -->
+                <button 
+                  @click="openSortSettings($event)" 
+                  class="text-gray-400 hover:text-indigo-600 p-1"
+                  :title="t('tagManager.tagGroupSortSettings')"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                    <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+                <button v-if="isEditingGroups" @click="deleteGroup(group.id)" class="text-gray-300 hover:text-red-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                     <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
             </div>
             
-            <!-- Group Content -->
-            <div v-if="!collapsedGroups.includes(group.id)" class="pl-1">
+            <!-- Group Content (for tag dropping) -->
+            <div 
+              v-if="!collapsedGroups.includes(group.id)" 
+              class="pl-1"
+              @dragover.prevent="onDrop($event, group.id)"
+              @drop.prevent="onDrop($event, group.id)"
+            >
                 <div class="flex flex-wrap gap-1.5">
                   <div 
-                    v-for="tag in group.tags" 
+                    v-for="(tag, tagIndex) in store.getSortedTagsInGroup(group.id)" 
                     :key="tag"
                     draggable="true"
-                    @dragstart="onDragStart($event, tag, group.id)"
+                    @dragstart="onDragStart($event, tag, group.id, tagIndex)"
                     @click="!isEditingGroups && toggleFilter(tag)"
                     class="text-xs px-2 py-0.5 rounded-full border cursor-pointer transition-colors select-none flex items-center gap-1"
                     :class="[
@@ -443,4 +544,11 @@ function confirmAddTag() {
     </div>
 
   </div>
+
+  <!-- Sort Settings Popover -->
+  <TagGroupSortSettingsPopover
+    v-if="showSortSettingsPopover"
+    :trigger-element="sortSettingsTriggerElement"
+    @close="closeSortSettings"
+  />
 </template>
