@@ -16,6 +16,7 @@ const selectedTemplateId = ref<string | null>(null);
 const newTemplateName = ref('');
 const newTemplateGroupName = ref('');
 const searchQuery = ref('');
+const highlightedId = ref<string | null>(null);
 const showStats = ref(false);
 const showSettings = ref(false);
 const settingsBtnRef = ref<HTMLElement | null>(null);
@@ -35,6 +36,10 @@ const showRenameTemplateDialog = ref(false);
 // Hover Preview Logic (for Quick Preview Mode)
 const hoveredTemplate = ref<FilterTemplate | null>(null);
 
+// 用于滚动定位的ref
+const templateRefs = ref<Record<string, HTMLElement>>({});
+const groupRefs = ref<Record<string, HTMLElement>>({});
+
 // --- Computed ---
 const selectedTemplate = computed(() => store.templates.find(t => t.id === selectedTemplateId.value));
 
@@ -52,6 +57,12 @@ function getGroupName(groupId: string | undefined): string {
     if (!groupId) return t('common.general');
     const group = store.getTemplateGroup(groupId);
     return group ? group.name : t('common.general');
+}
+
+// 检查是否匹配搜索关键词（用于高亮）
+function matchesSearch(text: string): boolean {
+    if (!searchQuery.value.trim()) return false;
+    return text.toLowerCase().includes(searchQuery.value.trim().toLowerCase());
 }
 
 // 获取所有模板组（包括通用组）
@@ -188,6 +199,69 @@ const sortedTemplateGroups = computed(() => {
     }
     
     return groups;
+});
+
+// 搜索结果计算属性
+const searchResults = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase();
+    if (!query) return [];
+
+    const results: Array<{
+        type: 'group' | 'template';
+        id: string;
+        name: string;
+        groupName?: string;
+        groupId?: string;
+    }> = [];
+
+    // 搜索模板组（包括通用组）
+    const generalGroup = store.getTemplateGroup(generalGroupId.value);
+    if (generalGroup && generalGroup.name.toLowerCase().includes(query)) {
+        results.push({
+            type: 'group',
+            id: generalGroup.id,
+            name: generalGroup.name
+        });
+    }
+    
+    store.templateGroups.forEach(group => {
+        if (group.name.toLowerCase().includes(query)) {
+            results.push({
+                type: 'group',
+                id: group.id,
+                name: group.name
+            });
+        }
+    });
+
+    // 搜索模板
+    store.templates.forEach(template => {
+        if (template.name.toLowerCase().includes(query)) {
+            // 找到模板所属的模板组
+            const groupId = template.groupId || generalGroupId.value;
+            const group = store.getTemplateGroup(groupId);
+            if (group) {
+                results.push({
+                    type: 'template',
+                    id: template.id,
+                    name: template.name,
+                    groupName: group.name,
+                    groupId: group.id
+                });
+            } else {
+                // 如果没有组，使用通用组名称
+                results.push({
+                    type: 'template',
+                    id: template.id,
+                    name: template.name,
+                    groupName: generalGroup?.name || t('common.general'),
+                    groupId: generalGroupId.value
+                });
+            }
+        }
+    });
+
+    return results;
 });
 
 // --- Actions ---
@@ -354,6 +428,52 @@ function moveTemplateToGroup(templateId: string, groupId: string) {
     });
 }
 
+// 搜索相关功能
+function handleSearchResultClick(result: typeof searchResults.value[0]) {
+    highlightedId.value = result.id;
+    
+    if (result.type === 'group') {
+        // 展开组并滚动到组位置
+        if (collapsedGroups.value.has(result.id)) {
+            collapsedGroups.value.delete(result.id);
+        }
+        nextTick(() => {
+            const element = groupRefs.value[result.id] || null;
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // 移除高亮（3秒后移除）
+                setTimeout(() => {
+                    if (highlightedId.value === result.id) {
+                        highlightedId.value = null;
+                    }
+                }, 3000);
+            }
+        });
+    } else {
+        // 选择模板并滚动到模板位置
+        selectedTemplateId.value = result.id;
+        // 确保模板所在的组是展开的
+        if (result.groupId && collapsedGroups.value.has(result.groupId)) {
+            collapsedGroups.value.delete(result.groupId);
+        }
+        nextTick(() => {
+            const element = templateRefs.value[result.id];
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // 移除高亮
+                setTimeout(() => {
+                    if (highlightedId.value === result.id) {
+                        highlightedId.value = null;
+                    }
+                }, 3000);
+            }
+        });
+    }
+    
+    // 清空搜索
+    searchQuery.value = '';
+}
+
 </script>
 
 <template>
@@ -405,18 +525,54 @@ function moveTemplateToGroup(templateId: string, groupId: string) {
                   <button @click="createTemplateGroup" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-sm hover:bg-indigo-700">+组</button>
               </div>
               <!-- Search -->
-              <div class="mt-2">
+              <div class="mt-2 relative">
                   <input 
                     v-model="searchQuery" 
+                    type="text"
                     :placeholder="t('placeholder.searchTemplatesAndGroups')"
-                    class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
+                    class="w-full text-sm border rounded-md px-2 py-1 pl-8 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                   />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-400 absolute left-2 top-1/2 transform -translate-y-1/2">
+                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                  </svg>
+                  
+                  <!-- 搜索结果下拉列表 -->
+                  <div
+                    v-if="searchQuery.trim() && searchResults.length > 0"
+                    class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-64 overflow-y-auto"
+                  >
+                      <div
+                        v-for="result in searchResults"
+                        :key="`${result.type}-${result.id}`"
+                        @click="handleSearchResultClick(result)"
+                        class="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                          <div class="flex items-center justify-between">
+                              <div class="flex items-center gap-2 flex-1 min-w-0">
+                                  <span
+                                    class="text-xs px-2 py-0.5 rounded"
+                                    :class="result.type === 'group' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'"
+                                  >
+                                      {{ result.type === 'group' ? '模板组' : '模板' }}
+                                  </span>
+                                  <span class="font-medium text-gray-900 truncate">{{ result.name }}</span>
+                              </div>
+                              <div v-if="result.type === 'template' && result.groupName" class="text-xs text-gray-500 ml-2 shrink-0">
+                                  位于: {{ result.groupName }}
+                              </div>
+                          </div>
+                      </div>
+                  </div>
               </div>
           </div>
           
           <div class="flex-1 overflow-y-auto p-2 space-y-4">
               <div v-for="group in sortedTemplateGroups" :key="group.id">
-                  <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between group">
+                  <div 
+                      :ref="el => { if (el) groupRefs[group.id] = el as HTMLElement }"
+                      class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between group"
+                      :class="highlightedId === group.id ? 'ring-2 ring-yellow-400 bg-yellow-50 rounded' : ''"
+                  >
                       <div class="flex items-center gap-2 min-w-0 flex-1">
                           <button
                               @click.stop="toggleGroupCollapse(group.id)"
@@ -432,7 +588,7 @@ function moveTemplateToGroup(templateId: string, groupId: string) {
                                   <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                               </svg>
                           </button>
-                          <span v-if="editingGroupId !== group.id" class="truncate">{{ group.name }}</span>
+                          <span v-if="editingGroupId !== group.id" class="truncate" :class="matchesSearch(group.name) ? 'bg-yellow-200 px-1 rounded' : ''">{{ group.name }}</span>
                           <input
                             v-else
                             :id="`rename-group-input-${group.id}`"
@@ -469,14 +625,18 @@ function moveTemplateToGroup(templateId: string, groupId: string) {
                       <div 
                         v-for="tpl in groupedFilteredTemplates[group.id] || []" 
                         :key="tpl.id"
+                        :ref="el => { if (el) templateRefs[tpl.id] = el as HTMLElement }"
                         @click="selectedTemplateId = tpl.id"
                         @mouseenter="uiStore.quickPreviewMode && (hoveredTemplate = tpl)"
                         @mouseleave="uiStore.quickPreviewMode && (hoveredTemplate = null)"
                         class="px-3 py-2 rounded cursor-pointer flex justify-between items-center group transition-colors"
-                        :class="selectedTemplateId === tpl.id ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-100 text-gray-700'"
+                        :class="[
+                            selectedTemplateId === tpl.id ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-100 text-gray-700',
+                            highlightedId === tpl.id ? 'ring-2 ring-yellow-400 bg-yellow-50' : ''
+                        ]"
                       >
                           <div class="flex items-center gap-2 flex-1 min-w-0">
-                              <span class="truncate">{{ tpl.name }}</span>
+                              <span class="truncate" :class="matchesSearch(tpl.name) ? 'bg-yellow-200 px-1 rounded' : ''">{{ tpl.name }}</span>
                               <span v-if="showStats" class="text-[10px] text-gray-400 ml-auto flex-shrink-0">
                                   ({{ store.getTemplateMatchCount(tpl.id) }})
                               </span>
