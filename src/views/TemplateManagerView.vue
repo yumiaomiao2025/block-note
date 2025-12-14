@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick, Teleport } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
 import { useUIStore } from '../stores/uiStore';
 import HoverPreviewPopover from '../components/HoverPreviewPopover.vue';
@@ -13,40 +13,23 @@ const { t } = useI18n();
 
 const selectedTemplateId = ref<string | null>(null);
 const newTemplateName = ref('');
-const editingGroupName = ref(false); // For editing the group name directly
 const searchQuery = ref('');
 const templateSortOrder = ref<'manual' | 'usage' | 'time' | 'name'>('manual');
-const isBatchMode = ref(false);
-const selectedTemplateIdsForBatch = ref<Set<string>>(new Set());
 const showStats = ref(false);
-const batchGroupName = ref('');
+
+// 模板组重命名相关
+const editingGroupName = ref<string | null>(null);
+const editingGroupNameValue = ref('');
+
+// 模板重命名相关
+const editingTemplateId = ref<string | null>(null);
+const editingTemplateName = ref('');
+const showRenameTemplateDialog = ref(false);
 
 // Hover Preview Logic (for Quick Preview Mode)
 const hoveredTemplate = ref<FilterTemplate | null>(null);
 
 // --- Computed ---
-const groupedTemplates = computed(() => {
-    const generalKey = t('common.general');
-    const groups: Record<string, typeof store.templates> = { [generalKey]: [] };
-    store.templates.forEach(t => {
-        const g = t.group || generalKey;
-        if (!groups[g]) groups[g] = [];
-        groups[g].push(t);
-    });
-    return groups;
-});
-
-const groupNames = computed(() => {
-    const keys = Object.keys(groupedTemplates.value);
-    // Ensure General is first
-    return keys.sort((a, b) => {
-        const generalKey = t('common.general');
-        if (a === generalKey) return -1;
-        if (b === generalKey) return 1;
-        return a.localeCompare(b);
-    });
-});
-
 const selectedTemplate = computed(() => store.templates.find(t => t.id === selectedTemplateId.value));
 
 // Filtered and sorted templates
@@ -119,19 +102,6 @@ function deleteTemplate(id: string) {
     }
 }
 
-function updateTemplateName(name: string) {
-    if (selectedTemplate.value && name.trim()) {
-        store.updateTemplate(selectedTemplate.value.id, { name: name.trim() });
-    }
-}
-
-function updateTemplateGroup(groupName: string) {
-    if (selectedTemplate.value) {
-        store.updateTemplate(selectedTemplate.value.id, { group: groupName.trim() || undefined });
-        editingGroupName.value = false;
-    }
-}
-
 // --- Tag Management ---
 function isTagSelected(tag: string): boolean {
     return selectedTemplate.value?.filterRules.includeTags.includes(tag) || false;
@@ -165,45 +135,77 @@ function duplicateTemplate(id: string) {
     selectedTemplateId.value = newTemplate.id;
 }
 
-function toggleBatchSelection(id: string) {
-    if (selectedTemplateIdsForBatch.value.has(id)) {
-        selectedTemplateIdsForBatch.value.delete(id);
-    } else {
-        selectedTemplateIdsForBatch.value.add(id);
-    }
-}
-
-function selectAllTemplates() {
-    filteredTemplates.value.forEach(t => {
-        selectedTemplateIdsForBatch.value.add(t.id);
-    });
-}
-
-function deselectAllTemplates() {
-    selectedTemplateIdsForBatch.value.clear();
-}
-
-function batchDelete() {
-    if (selectedTemplateIdsForBatch.value.size === 0) return;
-    if (confirm(t('templateManager.deleteTemplates', { count: selectedTemplateIdsForBatch.value.size }))) {
-        selectedTemplateIdsForBatch.value.forEach(id => {
-            store.deleteTemplate(id);
-        });
-        selectedTemplateIdsForBatch.value.clear();
-        isBatchMode.value = false;
-        if (selectedTemplateId.value && selectedTemplateIdsForBatch.value.has(selectedTemplateId.value)) {
-            selectedTemplateId.value = null;
+// 模板组重命名
+function startRenameGroup(groupName: string) {
+    const generalKey = t('common.general');
+    // 不允许重命名 General 组
+    if (groupName === generalKey) return;
+    
+    editingGroupName.value = groupName;
+    editingGroupNameValue.value = groupName;
+    nextTick(() => {
+        const input = document.getElementById(`rename-group-input-${groupName}`) as HTMLInputElement;
+        if (input) {
+            input.focus();
+            input.select();
         }
+    });
+}
+
+function confirmRenameGroup() {
+    if (!editingGroupName.value || !editingGroupNameValue.value.trim()) {
+        cancelRenameGroup();
+        return;
+    }
+    
+    const oldName = editingGroupName.value;
+    const newName = editingGroupNameValue.value.trim();
+    
+    if (oldName !== newName && newName) {
+        // 更新所有属于该组的模板
+        store.templates.forEach(template => {
+            if (template.group === oldName) {
+                store.updateTemplate(template.id, { group: newName });
+            }
+        });
+    }
+    
+    cancelRenameGroup();
+}
+
+function cancelRenameGroup() {
+    editingGroupName.value = null;
+    editingGroupNameValue.value = '';
+}
+
+// 模板重命名
+function startRenameTemplate(id: string) {
+    const template = store.templates.find(t => t.id === id);
+    if (template) {
+        editingTemplateId.value = id;
+        editingTemplateName.value = template.name;
+        showRenameTemplateDialog.value = true;
     }
 }
 
-function batchChangeGroup(groupName: string) {
-    if (selectedTemplateIdsForBatch.value.size === 0) return;
-    selectedTemplateIdsForBatch.value.forEach(id => {
-        store.updateTemplate(id, { group: groupName.trim() || undefined });
-    });
-    selectedTemplateIdsForBatch.value.clear();
-    isBatchMode.value = false;
+function confirmRenameTemplate() {
+    if (!editingTemplateId.value || !editingTemplateName.value.trim()) {
+        cancelRenameTemplate();
+        return;
+    }
+    
+    const template = store.templates.find(t => t.id === editingTemplateId.value);
+    if (template && template.name !== editingTemplateName.value.trim()) {
+        store.updateTemplate(editingTemplateId.value, { name: editingTemplateName.value.trim() });
+    }
+    
+    cancelRenameTemplate();
+}
+
+function cancelRenameTemplate() {
+    showRenameTemplateDialog.value = false;
+    editingTemplateId.value = null;
+    editingTemplateName.value = '';
 }
 
 </script>
@@ -253,87 +255,57 @@ function batchChangeGroup(groupName: string) {
                       <option value="time">{{ t('templateManager.sortTime') }}</option>
                   </select>
               </div>
-              <!-- Batch Mode Toggle -->
-              <div class="mt-2 flex items-center gap-2">
-                  <button
-                      @click="isBatchMode = !isBatchMode; if (!isBatchMode) selectedTemplateIdsForBatch.clear()"
-                      class="text-xs px-2 py-1 rounded border transition-colors"
-                      :class="isBatchMode ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'"
-                  >
-                      {{ isBatchMode ? t('templateManager.exitBatch') : t('templateManager.batchMode') }}
-                  </button>
-                  <div v-if="isBatchMode" class="flex gap-1">
-                      <button
-                          @click="selectAllTemplates"
-                          class="text-xs px-1.5 py-0.5 rounded border bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                          :title="t('templateManager.selectAll')"
-                      >
-                          {{ t('templateManager.all') }}
-                      </button>
-                      <button
-                          @click="deselectAllTemplates"
-                          class="text-xs px-1.5 py-0.5 rounded border bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                          :title="t('templateManager.deselectAll')"
-                      >
-                          {{ t('templateManager.none') }}
-                      </button>
-                  </div>
-              </div>
-              <!-- Batch Actions -->
-              <div v-if="isBatchMode && selectedTemplateIdsForBatch.size > 0" class="mt-2 space-y-1">
-                  <button
-                      @click="batchDelete"
-                      class="w-full text-xs px-2 py-1 rounded border bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                  >
-                      {{ t('btn.delete') }} ({{ selectedTemplateIdsForBatch.size }})
-                  </button>
-                  <div class="flex gap-1">
-                      <input
-                          v-model="batchGroupName"
-                          @keydown.enter="batchChangeGroup(batchGroupName)"
-                          :placeholder="t('placeholder.groupName')"
-                          class="flex-1 text-xs border rounded px-1.5 py-0.5"
-                      />
-                      <button
-                          @click="batchChangeGroup(batchGroupName)"
-                          class="text-xs px-2 py-0.5 rounded border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
-                      >
-                          Set
-                      </button>
-                  </div>
-              </div>
           </div>
           
           <div class="flex-1 overflow-y-auto p-2 space-y-4">
               <div v-for="group in groupNamesFiltered" :key="group">
-                  <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">{{ group }}</div>
+                  <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between group">
+                      <div class="flex items-center gap-2 min-w-0 flex-1">
+                          <span v-if="editingGroupName !== group" class="truncate">{{ group }}</span>
+                          <input
+                            v-else
+                            :id="`rename-group-input-${group}`"
+                            v-model="editingGroupNameValue"
+                            @keydown.enter="confirmRenameGroup"
+                            @keydown.esc="cancelRenameGroup"
+                            @blur="confirmRenameGroup"
+                            class="text-xs border border-indigo-500 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                            @click.stop
+                          />
+                      </div>
+                      <button 
+                        v-if="editingGroupName !== group && group !== t('common.general')"
+                        @click.stop="startRenameGroup(group)" 
+                        class="text-gray-400 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                        :title="t('btn.edit')"
+                      >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                            <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                          </svg>
+                      </button>
+                  </div>
                   <div class="space-y-1">
                       <div 
                         v-for="tpl in groupedFilteredTemplates[group]" 
                         :key="tpl.id"
-                        @click="isBatchMode ? toggleBatchSelection(tpl.id) : (selectedTemplateId = tpl.id)"
+                        @click="selectedTemplateId = tpl.id"
                         @mouseenter="uiStore.quickPreviewMode && (hoveredTemplate = tpl)"
                         @mouseleave="uiStore.quickPreviewMode && (hoveredTemplate = null)"
                         class="px-3 py-2 rounded cursor-pointer flex justify-between items-center group transition-colors"
-                        :class="[
-                            isBatchMode && selectedTemplateIdsForBatch.has(tpl.id) ? 'bg-indigo-100 text-indigo-700' : '',
-                            !isBatchMode && selectedTemplateId === tpl.id ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-100 text-gray-700'
-                        ]"
+                        :class="selectedTemplateId === tpl.id ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-100 text-gray-700'"
                       >
                           <div class="flex items-center gap-2 flex-1 min-w-0">
-                              <!-- Batch Checkbox -->
-                              <div v-if="isBatchMode" class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0"
-                                   :class="selectedTemplateIdsForBatch.has(tpl.id) ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'">
-                                  <svg v-if="selectedTemplateIdsForBatch.has(tpl.id)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-white">
-                                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                                  </svg>
-                              </div>
                               <span class="truncate">{{ tpl.name }}</span>
                               <span v-if="showStats" class="text-[10px] text-gray-400 ml-auto flex-shrink-0">
                                   ({{ store.getTemplateMatchCount(tpl.id) }})
                               </span>
                           </div>
                           <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button @click.stop="startRenameTemplate(tpl.id)" class="text-gray-400 hover:text-indigo-600 p-1" :title="t('btn.edit')">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                                    <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                                  </svg>
+                              </button>
                               <button @click.stop="duplicateTemplate(tpl.id)" class="text-gray-400 hover:text-indigo-600 p-1" :title="t('templateManager.duplicate')">
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
                                       <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
@@ -358,27 +330,10 @@ function batchChangeGroup(groupName: string) {
               <div class="p-6 border-b border-gray-200 bg-white shadow-sm z-10">
                   <div class="flex justify-between items-start mb-4">
                       <div>
-                          <input 
-                             :value="selectedTemplate.name"
-                             @change="(e) => updateTemplateName((e.target as HTMLInputElement).value)"
-                             class="text-2xl font-bold text-gray-900 border-b border-transparent hover:border-gray-300 focus:border-indigo-600 focus:outline-none bg-transparent"
-                          />
+                          <h1 class="text-2xl font-bold text-gray-900">{{ selectedTemplate.name }}</h1>
                           <div class="flex items-center gap-2 mt-2 text-sm text-gray-500">
                               <span>Group:</span>
-                              <div v-if="!editingGroupName" @click="editingGroupName = true" class="cursor-pointer hover:text-indigo-600 flex items-center gap-1">
-                                  {{ selectedTemplate.group || t('common.general') }}
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-                                    <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-                                  </svg>
-                              </div>
-                              <input 
-                                v-else
-                                :value="selectedTemplate.group || t('common.general')"
-                                @blur="(e) => updateTemplateGroup((e.target as HTMLInputElement).value)"
-                                @keydown.enter="(e) => updateTemplateGroup((e.target as HTMLInputElement).value)"
-                                class="border rounded px-1 py-0.5 text-sm"
-                                autoFocus
-                              />
+                              <span>{{ selectedTemplate.group || t('common.general') }}</span>
                           </div>
                           <!-- Statistics -->
                           <div v-if="showStats" class="mt-2 text-xs text-gray-500">
@@ -477,6 +432,51 @@ function batchChangeGroup(groupName: string) {
           </div>
       </div>
 
+      <!-- 重命名模板对话框 -->
+      <Teleport to="body">
+        <Transition name="modal">
+          <div v-if="showRenameTemplateDialog" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity" @click="cancelRenameTemplate"></div>
+
+            <!-- Modal -->
+            <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 transform transition-all scale-100" @click.stop>
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                {{ t('templateManager.renameTemplate') }}
+              </h3>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ t('templateManager.newTemplateName') }}
+                </label>
+                <input
+                  v-model="editingTemplateName"
+                  type="text"
+                  class="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  @keydown.enter="confirmRenameTemplate"
+                  @keydown.esc="cancelRenameTemplate"
+                  autofocus
+                />
+              </div>
+              
+              <div class="flex items-center justify-end gap-3">
+                <button 
+                  @click="cancelRenameTemplate"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                >
+                  {{ t('btn.cancel') }}
+                </button>
+                <button 
+                  @click="confirmRenameTemplate"
+                  class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm"
+                >
+                  {{ t('btn.confirm') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+
       <!-- Hover Preview Popover -->
       <HoverPreviewPopover
           v-if="uiStore.quickPreviewMode && hoveredTemplate"
@@ -486,3 +486,25 @@ function batchChangeGroup(groupName: string) {
       />
   </div>
 </template>
+
+<style scoped>
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .transform,
+.modal-leave-active .transform {
+  transition: transform 0.2s ease;
+}
+
+.modal-enter-from .transform,
+.modal-leave-to .transform {
+  transform: scale(0.95);
+}
+</style>

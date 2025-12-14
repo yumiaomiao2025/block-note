@@ -155,6 +155,8 @@ const translations: Record<Language, Translations> = {
       sortName: '名称 (A-Z)',
       sortUsage: '使用量 (高到低)',
       sortTime: '时间 (最新优先)',
+      renameTemplate: '重命名模板',
+      newTemplateName: '新模板名称',
     },
     lightTagSettings: {
       title: '轻标签显示设置',
@@ -338,6 +340,8 @@ const translations: Record<Language, Translations> = {
       sortName: 'Name (A-Z)',
       sortUsage: 'Usage (High to Low)',
       sortTime: 'Time (Newest First)',
+      renameTemplate: 'Rename Template',
+      newTemplateName: 'New Template Name',
     },
     lightTagSettings: {
       title: 'Light Tag Display Settings',
