@@ -51,10 +51,18 @@ export interface TagGroup {
   tags: string[];
 }
 
+export interface TemplateGroup {
+  id: string;
+  name: string;
+  order?: number; // 用于排序
+  createdAt?: number; // 创建时间，用于排序
+}
+
 export interface FilterTemplate {
   id: string;
   name: string;
-  group?: string; // Template group name
+  group?: string; // Template group name (deprecated, use groupId)
+  groupId?: string; // Template group ID
   filterRules: FilterRules;
   associatedTagGroups?: string[]; // IDs of TagGroups
 }

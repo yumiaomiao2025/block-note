@@ -3,8 +3,9 @@ import { ref, computed, nextTick, Teleport } from 'vue';
 import { useNoteStore } from '../stores/noteStore';
 import { useUIStore } from '../stores/uiStore';
 import HoverPreviewPopover from '../components/HoverPreviewPopover.vue';
+import TemplateSettingsPopover from '../components/TemplateSettingsPopover.vue';
 import { v4 as uuidv4 } from 'uuid';
-import type { FilterTemplate } from '../types/models';
+import type { FilterTemplate, TemplateGroup } from '../types/models';
 import { useI18n } from '../composables/useI18n';
 
 const store = useNoteStore();
@@ -13,12 +14,17 @@ const { t } = useI18n();
 
 const selectedTemplateId = ref<string | null>(null);
 const newTemplateName = ref('');
+const newTemplateGroupName = ref('');
 const searchQuery = ref('');
-const templateSortOrder = ref<'manual' | 'usage' | 'time' | 'name'>('manual');
 const showStats = ref(false);
+const showSettings = ref(false);
+const settingsBtnRef = ref<HTMLElement | null>(null);
 
-// 模板组重命名相关
-const editingGroupName = ref<string | null>(null);
+// 展开/折叠状态
+const collapsedGroups = ref<Set<string>>(new Set());
+
+// 模板组管理相关
+const editingGroupId = ref<string | null>(null);
 const editingGroupNameValue = ref('');
 
 // 模板重命名相关
@@ -32,54 +38,150 @@ const hoveredTemplate = ref<FilterTemplate | null>(null);
 // --- Computed ---
 const selectedTemplate = computed(() => store.templates.find(t => t.id === selectedTemplateId.value));
 
-// Filtered and sorted templates
-const filteredTemplates = computed(() => {
-    let result = store.templates;
-    
-    // Apply search filter
-    if (searchQuery.value.trim()) {
-        const query = searchQuery.value.toLowerCase();
-        result = result.filter(t => t.name.toLowerCase().includes(query));
-    }
-    
-    // Apply sorting
-    if (templateSortOrder.value === 'name') {
-        result = [...result].sort((a, b) => a.name.localeCompare(b.name));
-    } else if (templateSortOrder.value === 'usage') {
-        result = [...result].sort((a, b) => {
-            const countA = store.getTemplateMatchCount(a.id);
-            const countB = store.getTemplateMatchCount(b.id);
-            return countB - countA;
-        });
-    } else if (templateSortOrder.value === 'time') {
-        // Note: templates don't have createdAt, so we'll use array index as proxy
-        // In a real implementation, you'd want to add createdAt to FilterTemplate
-        result = [...result].reverse();
-    }
-    // 'manual' means keep original order
-    
-    return result;
-});
+// 获取通用组 ID
+const generalGroupId = computed(() => store.getGeneralGroupId());
 
-const groupedFilteredTemplates = computed(() => {
-    const generalKey = t('common.general');
-    const groups: Record<string, typeof filteredTemplates.value> = { [generalKey]: [] };
-    filteredTemplates.value.forEach(t => {
-        const g = t.group || generalKey;
-        if (!groups[g]) groups[g] = [];
-        groups[g].push(t);
+// 获取模板组名称
+function getGroupName(groupId: string | undefined): string {
+    if (!groupId) return t('common.general');
+    const group = store.getTemplateGroup(groupId);
+    return group ? group.name : t('common.general');
+}
+
+// 获取所有模板组（包括通用组）
+const allTemplateGroups = computed(() => {
+    const groups: TemplateGroup[] = [];
+    // 添加通用组
+    const generalGroup = store.getTemplateGroup(generalGroupId.value);
+    if (generalGroup) {
+        groups.push(generalGroup);
+    }
+    // 添加其他组
+    store.templateGroups.forEach(group => {
+        if (group.id !== generalGroupId.value) {
+            groups.push(group);
+        }
     });
     return groups;
 });
 
-const groupNamesFiltered = computed(() => {
-    const keys = Object.keys(groupedFilteredTemplates.value);
-    return keys.sort((a, b) => {
-        const generalKey = t('common.general');
-        if (a === generalKey) return -1;
-        if (b === generalKey) return 1;
-        return a.localeCompare(b);
+// 过滤和排序模板
+const filteredTemplates = computed(() => {
+    let result = store.templates;
+    
+    // 应用搜索过滤（同时搜索模板名称和模板组名称）
+    if (searchQuery.value.trim()) {
+        const query = searchQuery.value.toLowerCase();
+        const matchingGroupIds = new Set<string>();
+        
+        // 查找匹配的模板组
+        allTemplateGroups.value.forEach(group => {
+            if (group.name.toLowerCase().includes(query)) {
+                matchingGroupIds.add(group.id);
+            }
+        });
+        
+        result = result.filter(t => {
+            // 模板名称匹配
+            if (t.name.toLowerCase().includes(query)) {
+                return true;
+            }
+            // 模板组名称匹配
+            if (t.groupId && matchingGroupIds.has(t.groupId)) {
+                return true;
+            }
+            // 向后兼容：检查旧的 group 字段
+            if (t.group && t.group.toLowerCase().includes(query)) {
+                return true;
+            }
+            return false;
+        });
+    }
+    
+    return result;
+});
+
+// 按组分组模板
+const groupedFilteredTemplates = computed(() => {
+    const groups: Record<string, FilterTemplate[]> = {};
+    
+    // 初始化所有组
+    allTemplateGroups.value.forEach(group => {
+        groups[group.id] = [];
     });
+    
+    // 分配模板到组
+    filteredTemplates.value.forEach(t => {
+        const groupId = t.groupId || generalGroupId.value;
+        if (!groups[groupId]) {
+            groups[groupId] = [];
+        }
+        groups[groupId].push(t);
+    });
+    
+    // 对每个组内的模板进行排序
+    Object.keys(groups).forEach(groupId => {
+        const templates = groups[groupId];
+        const sortOrder = store.templateInGroupSortOrder;
+        
+        if (sortOrder === 'name') {
+            templates.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (sortOrder === 'usage') {
+            templates.sort((a, b) => {
+                const countA = store.getTemplateMatchCount(a.id);
+                const countB = store.getTemplateMatchCount(b.id);
+                return countB - countA;
+            });
+        } else if (sortOrder === 'time') {
+            // 使用数组索引作为代理（因为模板没有 createdAt）
+            templates.reverse();
+        }
+        // 'manual' 保持原始顺序
+    });
+    
+    return groups;
+});
+
+// 排序后的模板组列表
+const sortedTemplateGroups = computed(() => {
+    let groups = [...allTemplateGroups.value];
+    const sortOrder = store.templateGroupSortOrder;
+    
+    if (sortOrder === 'name') {
+        groups.sort((a, b) => {
+            // 通用组始终在最前面
+            if (a.id === generalGroupId.value) return -1;
+            if (b.id === generalGroupId.value) return 1;
+            return a.name.localeCompare(b.name);
+        });
+    } else if (sortOrder === 'usage') {
+        groups.sort((a, b) => {
+            // 通用组始终在最前面
+            if (a.id === generalGroupId.value) return -1;
+            if (b.id === generalGroupId.value) return 1;
+            const countA = store.getTemplateGroupUsageCount(a.id);
+            const countB = store.getTemplateGroupUsageCount(b.id);
+            return countB - countA;
+        });
+    } else if (sortOrder === 'time') {
+        groups.sort((a, b) => {
+            // 通用组始终在最前面
+            if (a.id === generalGroupId.value) return -1;
+            if (b.id === generalGroupId.value) return 1;
+            const timeA = a.createdAt || 0;
+            const timeB = b.createdAt || 0;
+            return timeB - timeA;
+        });
+    } else {
+        // 'manual' 保持原始顺序，但通用组在最前面
+        groups.sort((a, b) => {
+            if (a.id === generalGroupId.value) return -1;
+            if (b.id === generalGroupId.value) return 1;
+            return 0;
+        });
+    }
+    
+    return groups;
 });
 
 // --- Actions ---
@@ -91,6 +193,42 @@ function createTemplate() {
              selectedTemplateId.value = store.selectedTemplateIds[0];
         }
     }
+}
+
+function createTemplateGroup() {
+    if (newTemplateGroupName.value.trim()) {
+        store.createTemplateGroup(newTemplateGroupName.value.trim());
+        newTemplateGroupName.value = '';
+    }
+}
+
+function deleteTemplateGroup(id: string) {
+    const group = store.getTemplateGroup(id);
+    if (!group) return;
+    
+    const templatesInGroup = store.templates.filter(t => t.groupId === id);
+    
+    const message = templatesInGroup.length > 0
+        ? t('templateManager.deleteTemplateGroupConfirm', { name: group.name }) + '\n\n' + 
+          t('templateManager.deleteTemplateGroupWithTemplates', { count: templatesInGroup.length })
+        : t('templateManager.deleteTemplateGroupConfirm', { name: group.name }) + '\n\n' + 
+          t('templateManager.deleteTemplateGroupNoTemplates');
+    
+    if (confirm(message)) {
+        store.deleteTemplateGroup(id);
+    }
+}
+
+function toggleGroupCollapse(groupId: string) {
+    if (collapsedGroups.value.has(groupId)) {
+        collapsedGroups.value.delete(groupId);
+    } else {
+        collapsedGroups.value.add(groupId);
+    }
+}
+
+function isGroupCollapsed(groupId: string): boolean {
+    return collapsedGroups.value.has(groupId);
 }
 
 function deleteTemplate(id: string) {
@@ -136,15 +274,17 @@ function duplicateTemplate(id: string) {
 }
 
 // 模板组重命名
-function startRenameGroup(groupName: string) {
-    const generalKey = t('common.general');
-    // 不允许重命名 General 组
-    if (groupName === generalKey) return;
+function startRenameGroup(groupId: string) {
+    const group = store.getTemplateGroup(groupId);
+    if (!group) return;
     
-    editingGroupName.value = groupName;
-    editingGroupNameValue.value = groupName;
+    // 不允许重命名通用组
+    if (groupId === generalGroupId.value) return;
+    
+    editingGroupId.value = groupId;
+    editingGroupNameValue.value = group.name;
     nextTick(() => {
-        const input = document.getElementById(`rename-group-input-${groupName}`) as HTMLInputElement;
+        const input = document.getElementById(`rename-group-input-${groupId}`) as HTMLInputElement;
         if (input) {
             input.focus();
             input.select();
@@ -153,28 +293,19 @@ function startRenameGroup(groupName: string) {
 }
 
 function confirmRenameGroup() {
-    if (!editingGroupName.value || !editingGroupNameValue.value.trim()) {
+    if (!editingGroupId.value || !editingGroupNameValue.value.trim()) {
         cancelRenameGroup();
         return;
     }
     
-    const oldName = editingGroupName.value;
     const newName = editingGroupNameValue.value.trim();
-    
-    if (oldName !== newName && newName) {
-        // 更新所有属于该组的模板
-        store.templates.forEach(template => {
-            if (template.group === oldName) {
-                store.updateTemplate(template.id, { group: newName });
-            }
-        });
-    }
+    store.updateTemplateGroup(editingGroupId.value, { name: newName });
     
     cancelRenameGroup();
 }
 
 function cancelRenameGroup() {
-    editingGroupName.value = null;
+    editingGroupId.value = null;
     editingGroupNameValue.value = '';
 }
 
@@ -217,14 +348,27 @@ function cancelRenameTemplate() {
           <div class="p-4 border-b border-gray-200 bg-white">
               <div class="flex items-center justify-between mb-2">
                   <h2 class="font-bold text-lg text-gray-800">{{ t('templateManager.templates') }}</h2>
-                  <button
-                      @click="showStats = !showStats"
-                      class="w-6 h-6 rounded border text-[10px] flex items-center justify-center transition-colors"
-                      :class="showStats ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
-                      :title="t('templateManager.showHideStatistics')"
-                  >
-                      #
-                  </button>
+                  <div class="flex items-center gap-1">
+                      <button
+                          ref="settingsBtnRef"
+                          @click="showSettings = !showSettings"
+                          class="w-6 h-6 rounded border text-[10px] flex items-center justify-center transition-colors"
+                          :class="showSettings ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300 hover:bg-gray-200'"
+                          :title="t('templateManager.sortSettings')"
+                      >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                            <path fill-rule="evenodd" d="M8.5 2a1 1 0 000 2h.5a1 1 0 100-2h-.5zM5.22 3.22a.75.75 0 000 1.06l.5.5a.75.75 0 001.06-1.06l-.5-.5a.75.75 0 00-1.06 0zM13 2a1 1 0 100 2h.5a1 1 0 100-2H13zM3.28 6.22a.75.75 0 00-1.06 1.06l.5.5a.75.75 0 101.06-1.06l-.5-.5zM17 8a1 1 0 01-1 1h-.5a1 1 0 110-2H16a1 1 0 011 1zM9 10.5a1 1 0 01.5.866v4.134a.75.75 0 001.5 0v-4.134A1 1 0 0111 10.5a1 1 0 01-2 0zM4.5 13a1 1 0 100-2h-.5a1 1 0 100 2h.5zM17.72 13.78a.75.75 0 10-1.06-1.06l-.5.5a.75.75 0 101.06 1.06l.5-.5zM10 18a1 1 0 100-2h.5a1 1 0 100 2H10zM3.22 16.78a.75.75 0 001.06-1.06l-.5-.5a.75.75 0 10-1.06 1.06l.5.5zM14.5 18a1 1 0 100-2h.5a1 1 0 100 2h-.5z" clip-rule="evenodd" />
+                          </svg>
+                      </button>
+                      <button
+                          @click="showStats = !showStats"
+                          class="w-6 h-6 rounded border text-[10px] flex items-center justify-center transition-colors"
+                          :class="showStats ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-100 text-gray-400 border-gray-300'"
+                          :title="t('templateManager.showHideStatistics')"
+                      >
+                          #
+                      </button>
+                  </div>
               </div>
               <div class="mt-2 flex gap-2">
                   <input 
@@ -235,36 +379,48 @@ function cancelRenameTemplate() {
                   />
                   <button @click="createTemplate" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-sm hover:bg-indigo-700">+</button>
               </div>
+              <!-- Create Template Group -->
+              <div class="mt-2 flex gap-2">
+                  <input 
+                    v-model="newTemplateGroupName" 
+                    :placeholder="t('placeholder.newTemplateGroupName')"
+                    class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
+                    @keydown.enter="createTemplateGroup"
+                  />
+                  <button @click="createTemplateGroup" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-sm hover:bg-indigo-700">+组</button>
+              </div>
               <!-- Search -->
               <div class="mt-2">
                   <input 
                     v-model="searchQuery" 
-                    :placeholder="t('placeholder.searchTemplates')"
+                    :placeholder="t('placeholder.searchTemplatesAndGroups')"
                     class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
                   />
-              </div>
-              <!-- Sort -->
-              <div class="mt-2">
-                  <select 
-                    v-model="templateSortOrder"
-                    class="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:border-indigo-500"
-                  >
-                      <option value="manual">{{ t('templateManager.sortManual') }}</option>
-                      <option value="name">{{ t('templateManager.sortName') }}</option>
-                      <option value="usage">{{ t('templateManager.sortUsage') }}</option>
-                      <option value="time">{{ t('templateManager.sortTime') }}</option>
-                  </select>
               </div>
           </div>
           
           <div class="flex-1 overflow-y-auto p-2 space-y-4">
-              <div v-for="group in groupNamesFiltered" :key="group">
+              <div v-for="group in sortedTemplateGroups" :key="group.id">
                   <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between group">
                       <div class="flex items-center gap-2 min-w-0 flex-1">
-                          <span v-if="editingGroupName !== group" class="truncate">{{ group }}</span>
+                          <button
+                              @click.stop="toggleGroupCollapse(group.id)"
+                              class="text-gray-400 hover:text-indigo-500 transition-colors p-0.5"
+                          >
+                              <svg 
+                                  xmlns="http://www.w3.org/2000/svg" 
+                                  viewBox="0 0 20 20" 
+                                  fill="currentColor" 
+                                  class="w-3 h-3 transition-transform"
+                                  :class="isGroupCollapsed(group.id) ? '' : 'rotate-90'"
+                              >
+                                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                              </svg>
+                          </button>
+                          <span v-if="editingGroupId !== group.id" class="truncate">{{ group.name }}</span>
                           <input
                             v-else
-                            :id="`rename-group-input-${group}`"
+                            :id="`rename-group-input-${group.id}`"
                             v-model="editingGroupNameValue"
                             @keydown.enter="confirmRenameGroup"
                             @keydown.esc="cancelRenameGroup"
@@ -273,20 +429,30 @@ function cancelRenameTemplate() {
                             @click.stop
                           />
                       </div>
-                      <button 
-                        v-if="editingGroupName !== group && group !== t('common.general')"
-                        @click.stop="startRenameGroup(group)" 
-                        class="text-gray-400 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                        :title="t('btn.edit')"
-                      >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-                            <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-                          </svg>
-                      </button>
+                      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            v-if="editingGroupId !== group.id && group.id !== generalGroupId"
+                            @click.stop="startRenameGroup(group.id)" 
+                            class="text-gray-400 hover:text-indigo-500 transition-opacity p-1"
+                            :title="t('btn.edit')"
+                          >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
+                                <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                              </svg>
+                          </button>
+                          <button 
+                            v-if="group.id !== generalGroupId"
+                            @click.stop="deleteTemplateGroup(group.id)" 
+                            class="text-gray-400 hover:text-red-500 transition-opacity p-1"
+                            :title="t('templateManager.deleteTemplateGroup')"
+                          >
+                              &times;
+                          </button>
+                      </div>
                   </div>
-                  <div class="space-y-1">
+                  <div v-if="!isGroupCollapsed(group.id)" class="space-y-1">
                       <div 
-                        v-for="tpl in groupedFilteredTemplates[group]" 
+                        v-for="tpl in groupedFilteredTemplates[group.id] || []" 
                         :key="tpl.id"
                         @click="selectedTemplateId = tpl.id"
                         @mouseenter="uiStore.quickPreviewMode && (hoveredTemplate = tpl)"
@@ -333,7 +499,7 @@ function cancelRenameTemplate() {
                           <h1 class="text-2xl font-bold text-gray-900">{{ selectedTemplate.name }}</h1>
                           <div class="flex items-center gap-2 mt-2 text-sm text-gray-500">
                               <span>Group:</span>
-                              <span>{{ selectedTemplate.group || t('common.general') }}</span>
+                              <span>{{ getGroupName(selectedTemplate.groupId) }}</span>
                           </div>
                           <!-- Statistics -->
                           <div v-if="showStats" class="mt-2 text-xs text-gray-500">
@@ -483,6 +649,13 @@ function cancelRenameTemplate() {
           type="template"
           :data="hoveredTemplate"
           position="follow"
+      />
+
+      <!-- Template Settings Popover -->
+      <TemplateSettingsPopover
+          v-if="showSettings"
+          :triggerElement="settingsBtnRef"
+          @close="showSettings = false"
       />
   </div>
 </template>

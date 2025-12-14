@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { useStorage } from '@vueuse/core';
 import { v4 as uuidv4 } from 'uuid';
-import type { NoteBlock, FilterTemplate, FilterRules, TagGroup } from '../types/models';
+import type { NoteBlock, FilterTemplate, FilterRules, TagGroup, TemplateGroup } from '../types/models';
 import { computed, ref } from 'vue';
 import { useUIStore } from './uiStore'; // Import UI Store
 
@@ -10,8 +10,13 @@ export const useNoteStore = defineStore('note', () => {
   const notes = useStorage<NoteBlock[]>('blocknote-notes', []);
   const templates = useStorage<FilterTemplate[]>('blocknote-templates', []);
   const tagGroups = useStorage<TagGroup[]>('blocknote-tag-groups', []);
+  const templateGroups = useStorage<TemplateGroup[]>('blocknote-template-groups', []);
   const lightTagSystem = useStorage<string[]>('blocknote-light-tag-system', []);
   const normalTagSystem = useStorage<string[]>('blocknote-normal-tag-system', []);
+  
+  // Template sorting states
+  const templateGroupSortOrder = useStorage<'manual' | 'name' | 'usage' | 'time'>('blocknote-template-group-sort', 'manual');
+  const templateInGroupSortOrder = useStorage<'manual' | 'name' | 'usage' | 'time'>('blocknote-template-in-group-sort', 'manual');
   
   // Active filter state (not persisted automatically, resets on reload, or could be persisted)
   const activeFilter = useStorage<FilterRules>('blocknote-active-filter', {
@@ -386,12 +391,13 @@ export const useNoteStore = defineStore('note', () => {
     selectedTemplateIds.value = [];
   }
 
-  function createTemplate(name: string, associatedTagGroups: string[] = []) {
+  function createTemplate(name: string, associatedTagGroups: string[] = [], groupId?: string) {
     const newTemplate: FilterTemplate = {
       id: uuidv4(),
       name,
       filterRules: JSON.parse(JSON.stringify(activeFilter.value)),
-      associatedTagGroups
+      associatedTagGroups,
+      groupId
     };
     templates.value.push(newTemplate);
     selectedTemplateIds.value = [newTemplate.id];
@@ -439,10 +445,121 @@ export const useNoteStore = defineStore('note', () => {
     }).length;
   }
 
+  // Template Group Actions
+  function getGeneralGroupId(): string {
+    // 查找或创建"通用"组
+    const generalGroup = templateGroups.value.find(g => g.name === '通用' || g.name === 'General');
+    if (generalGroup) {
+      return generalGroup.id;
+    }
+    // 如果不存在，创建一个
+    const newGeneralGroup: TemplateGroup = {
+      id: uuidv4(),
+      name: '通用',
+      createdAt: Date.now()
+    };
+    templateGroups.value.push(newGeneralGroup);
+    return newGeneralGroup.id;
+  }
+
+  function createTemplateGroup(name: string): string {
+    const newGroup: TemplateGroup = {
+      id: uuidv4(),
+      name,
+      createdAt: Date.now()
+    };
+    templateGroups.value.push(newGroup);
+    return newGroup.id;
+  }
+
+  function deleteTemplateGroup(id: string) {
+    const group = templateGroups.value.find(g => g.id === id);
+    if (!group) return;
+    
+    // 获取通用组 ID
+    const generalGroupId = getGeneralGroupId();
+    
+    // 将组内的所有模板移动到通用组
+    templates.value.forEach(template => {
+      if (template.groupId === id) {
+        template.groupId = generalGroupId;
+        // 清除旧的 group 字段（向后兼容）
+        if (template.group) {
+          delete template.group;
+        }
+      }
+    });
+    
+    // 删除模板组
+    const index = templateGroups.value.findIndex(g => g.id === id);
+    if (index !== -1) {
+      templateGroups.value.splice(index, 1);
+    }
+  }
+
+  function updateTemplateGroup(id: string, updates: Partial<TemplateGroup>) {
+    const group = templateGroups.value.find(g => g.id === id);
+    if (group) {
+      Object.assign(group, updates);
+    }
+  }
+
+  function getTemplateGroup(id: string): TemplateGroup | undefined {
+    return templateGroups.value.find(g => g.id === id);
+  }
+
+  function getTemplateGroupUsageCount(groupId: string): number {
+    const groupTemplates = templates.value.filter(t => t.groupId === groupId);
+    return groupTemplates.reduce((sum, template) => {
+      return sum + getTemplateMatchCount(template.id);
+    }, 0);
+  }
+
+  // 数据迁移：将旧的 template.group 字符串转换为模板组 ID
+  function migrateTemplateGroups() {
+    const groupNameMap = new Map<string, string>(); // 组名 -> 组ID 的映射
+    
+    templates.value.forEach(template => {
+      // 如果模板有旧的 group 字段但没有 groupId
+      if (template.group && !template.groupId) {
+        const groupName = template.group;
+        
+        // 查找或创建对应的模板组
+        let groupId = groupNameMap.get(groupName);
+        if (!groupId) {
+          const existingGroup = templateGroups.value.find(g => g.name === groupName);
+          if (existingGroup) {
+            groupId = existingGroup.id;
+          } else {
+            // 创建新的模板组
+            const newGroup: TemplateGroup = {
+              id: uuidv4(),
+              name: groupName,
+              createdAt: Date.now()
+            };
+            templateGroups.value.push(newGroup);
+            groupId = newGroup.id;
+          }
+          groupNameMap.set(groupName, groupId);
+        }
+        
+        // 更新模板的 groupId
+        template.groupId = groupId;
+        // 保留旧的 group 字段一段时间以确保兼容性，但优先使用 groupId
+      }
+    });
+  }
+
+  // 在初始化时执行迁移
+  if (templates.value.length > 0) {
+    migrateTemplateGroups();
+  }
+
   return {
     notes,
     templates,
     tagGroups,
+    templateGroups,
     lightTagSystem,
     normalTagSystem,
     activeFilter,
@@ -455,6 +572,8 @@ export const useNoteStore = defineStore('note', () => {
     isNormalTagFilterEnabled,
     tagFilterMode,
     lightTagFilterMode,
+    templateGroupSortOrder,
+    templateInGroupSortOrder,
     currentTemplateId,
     allTags,
     uncategorizedTags,
@@ -484,6 +603,12 @@ export const useNoteStore = defineStore('note', () => {
     toggleTemplate,
     switchTemplate,
     getTagUsageCount,
-    getTemplateMatchCount
+    getTemplateMatchCount,
+    getGeneralGroupId,
+    createTemplateGroup,
+    deleteTemplateGroup,
+    updateTemplateGroup,
+    getTemplateGroup,
+    getTemplateGroupUsageCount
   };
 });
