@@ -25,6 +25,7 @@ const translations: Record<Language, Translations> = {
       tagStagingArea: '标签暂存区',
       quickFilter: '快速筛选',
       refineByLightTags: '通过轻标签筛选',
+      noTemplates: '暂无模板',
     },
     sort: {
       sort: '排序',
@@ -157,6 +158,13 @@ const translations: Record<Language, Translations> = {
       sortTime: '时间 (最新优先)',
       renameTemplate: '重命名模板',
       newTemplateName: '新模板名称',
+      createGroup: '创建新组',
+      deleteGroup: '删除组',
+      deleteGroupConfirm: '确定要删除组"{name}"吗？',
+      deleteGroupWithTemplates: '该组包含 {count} 个模板。删除后，这些模板将移动到"通用"组。',
+      deleteGroupNoTemplates: '该组目前没有模板。',
+      moveTemplateToGroup: '移动到组',
+      changeGroup: '更改组',
     },
     lightTagSettings: {
       title: '轻标签显示设置',
@@ -210,6 +218,7 @@ const translations: Record<Language, Translations> = {
       tagStagingArea: 'Tag Staging Area',
       quickFilter: 'Quick Filter',
       refineByLightTags: 'Refine by light tags',
+      noTemplates: 'No templates',
     },
     sort: {
       sort: 'Sort',

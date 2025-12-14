@@ -50,12 +50,30 @@ function handleCreateGroup() {
 
 function deleteGroup(id: string) {
   const group = store.tagGroups.find(g => g.id === id);
-  const message = group 
-    ? t('tagManager.deleteTagGroupWarning')
-    : t('tagManager.deleteTagGroupNoTags');
-  if (confirm(message)) {
-    store.deleteTagGroup(id);
-  }
+  if (!group) return;
+
+  // 统计组内标签的使用情况
+  let totalUsage = 0;
+  group.tags.forEach(tag => {
+    totalUsage += store.getTagUsageCount(tag);
+  });
+
+  const message = group.tags.length > 0
+    ? t('tagManager.deleteTagGroupConfirm', { name: group.name }) + '\n\n' + 
+      t('tagManager.deleteTagGroupWithTags', { count: group.tags.length, usage: totalUsage }) + '\n\n' +
+      t('tagManager.deleteTagGroupWarning')
+    : t('tagManager.deleteTagGroupConfirm', { name: group.name }) + '\n\n' + 
+      t('tagManager.deleteTagGroupNoTags');
+
+  uiStore.showConfirm({
+    title: t('dialog.deleteTagGroup.title'),
+    message: message,
+    confirmText: t('btn.delete'),
+    cancelText: t('btn.cancel'),
+    onConfirm: () => {
+      store.deleteTagGroup(id);
+    }
+  });
 }
 
 function toggleFilter(tag: string) {
@@ -89,9 +107,15 @@ function handleCreateTemplate() {
 }
 
 function deleteTemplate(id: string) {
-  if (confirm(t('templateManager.deleteTemplate'))) {
-    store.deleteTemplate(id);
-  }
+  uiStore.showConfirm({
+    title: t('templateManager.deleteTemplate'),
+    message: t('templateManager.deleteTemplate'),
+    confirmText: t('btn.delete'),
+    cancelText: t('btn.cancel'),
+    onConfirm: () => {
+      store.deleteTemplate(id);
+    }
+  });
 }
 
 function toggleGroupForTemplate(groupId: string) {
